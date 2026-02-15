@@ -17,7 +17,7 @@ from telegram.ext import (
     filters,
 )
 
-TOKEN = os.environ.get("7568782062:AAF-abA22OoC2icewtwKROXS8kIWulCGO6k")   # ✅ IMPORTANT FOR RENDER
+TOKEN = os.environ.get("7568782062:AAHiNQvaGbnqDfu78iZinGaSBIbgtx_UUxQ")   # ✅ IMPORTANT FOR RENDER
 
 # ===================== KEEP RENDER ALIVE =====================
 
@@ -310,4 +310,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
