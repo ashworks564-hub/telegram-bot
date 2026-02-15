@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ✅ FIXED TOKEN LINE
-TOKEN = os.environ.get("7568782062:AAHiNQvaGbnqDfu78iZinGaSBIbgtx_UUxQ")
+TOKEN = os.environ.get("TOKEN")
 
 if not TOKEN:
     raise ValueError("TOKEN environment variable is not set!")
@@ -285,3 +285,4 @@ if __name__ == "__main__":
 
     logger.info("🔥 DateMate Running...")
     app.run_polling()
+
