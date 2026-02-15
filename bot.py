@@ -1,9 +1,4 @@
 import os
-import json
-import logging
-import asyncio
-from pathlib import Path
-
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -19,270 +14,261 @@ from telegram.ext import (
     filters,
 )
 
-# ===================== CONFIG =====================
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+TOKEN = os.environ.get("TOKEN")  # Render variable
 
-# ✅ FIXED TOKEN LINE
-TOKEN = os.environ.get("TOKEN")
-
-if not TOKEN:
-    raise ValueError("TOKEN environment variable is not set!")
-
-# ===================== DATA STORAGE =====================
-DATA_FILE = Path("datemate_data.json")
-_save_lock = asyncio.Lock()
-_match_lock = asyncio.Lock()
-
-
-def load_data():
-    if DATA_FILE.exists():
-        try:
-            with open(DATA_FILE, "r") as f:
-                return json.load(f)
-        except Exception as e:
-            logger.error(f"Data load failed: {e}")
-
-    return {
-        "users": {},
-        "active_chats": {},
-        "male_queue": [],
-        "female_queue": [],
-    }
-
-
-async def save_data(data):
-    async with _save_lock:
-        tmp = DATA_FILE.with_suffix(".tmp")
-        with open(tmp, "w") as f:
-            json.dump(data, f)
-        tmp.replace(DATA_FILE)
-
-
-bot_data = load_data()
+# ===================== DATA =====================
+users = {}
+male_queue = []
+female_queue = []
+active = {}
 
 # ===================== UI =====================
 MAIN_MENU = ReplyKeyboardMarkup(
-    [["⚡ Find a partner", "👤 My Profile"]],
+    [["⚡ Find Partner", "👤 My Profile"]],
     resize_keyboard=True
 )
 
+def find_button():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⚡ Find Partner", callback_data="find")]
+    ])
 
 def chat_buttons():
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("⏭ NEXT", callback_data="chat_next"),
-            InlineKeyboardButton("❌ EXIT", callback_data="chat_exit"),
+            InlineKeyboardButton("⏭ NEXT", callback_data="next"),
+            InlineKeyboardButton("❌ END", callback_data="end"),
         ]
     ])
 
-# ===================== HELPERS =====================
-
-async def leave_queue(uid):
-    uid_str = str(uid)
-    removed = False
-
-    for queue in ("male_queue", "female_queue"):
-        if uid_str in bot_data[queue]:
-            bot_data[queue].remove(uid_str)
-            removed = True
-
-    if removed:
-        await save_data(bot_data)
-
-    return removed
-
-
-async def end_chat(uid, partner_id, context, reason="ended"):
-    uid_str = str(uid)
-    pid_str = str(partner_id)
-
-    bot_data["active_chats"].pop(uid_str, None)
-    bot_data["active_chats"].pop(pid_str, None)
-
-    await save_data(bot_data)
-
-    try:
-        await context.bot.send_message(uid, "❌ Chat ended.", reply_markup=MAIN_MENU)
-    except:
-        pass
-
-    try:
-        await context.bot.send_message(partner_id, "❌ Partner left.", reply_markup=MAIN_MENU)
-    except:
-        pass
-
-
-async def find_partner_logic(uid, context):
-    uid_str = str(uid)
-    user = bot_data["users"].get(uid_str)
-
-    if not user or not user.get("gender"):
-        await context.bot.send_message(uid, "❗ Use /start first.")
-        return
-
-    gender = user["gender"]
-
-    async with _match_lock:
-        if uid_str in bot_data["active_chats"]:
-            await context.bot.send_message(uid, "⚠️ Already chatting.")
-            return
-
-        target_queue = bot_data["female_queue"] if gender == "male" else bot_data["male_queue"]
-        my_queue = bot_data["male_queue"] if gender == "male" else bot_data["female_queue"]
-
-        target_queue[:] = [u for u in target_queue if u != uid_str]
-
-        if target_queue:
-            partner_id_str = target_queue.pop(0)
-            partner_id = int(partner_id_str)
-
-            bot_data["active_chats"][uid_str] = partner_id_str
-            bot_data["active_chats"][partner_id_str] = uid_str
-
-            await save_data(bot_data)
-
-        else:
-            if uid_str not in my_queue:
-                my_queue.append(uid_str)
-                await save_data(bot_data)
-
-            await context.bot.send_message(uid, "⏳ Waiting for partner...")
-            return
-
-    partner_id = int(bot_data["active_chats"][uid_str])
-
-    for person, other in [(uid, partner_id), (partner_id, uid)]:
-        await context.bot.send_message(
-            person,
-            "💖 Match Found!\n💬 Text only",
-            reply_markup=chat_buttons()
-        )
-
-# ===================== COMMANDS =====================
-
+# ===================== START =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
-    uid_str = str(uid)
 
-    if uid_str in bot_data["active_chats"]:
-        partner_id = int(bot_data["active_chats"][uid_str])
-        await end_chat(uid, partner_id, context)
-
-    await leave_queue(uid)
-
-    bot_data["users"][uid_str] = {"gender": None}
-    await save_data(bot_data)
+    users[uid] = {
+        "gender": None,
+        "age": None,
+        "country": None,
+    }
 
     kb = [[
-        InlineKeyboardButton("👦 Male", callback_data="reg_male"),
-        InlineKeyboardButton("👧 Female", callback_data="reg_female"),
+        InlineKeyboardButton("👦 Male", callback_data="gender_male"),
+        InlineKeyboardButton("👧 Female", callback_data="gender_female"),
     ]]
 
     await update.message.reply_text(
-        "👋 Welcome to DateMate ❤️\nSelect gender:",
-        reply_markup=InlineKeyboardMarkup(kb)
+        "👋 Welcome to DateMate ❤️\n\nSelect your gender:",
+        reply_markup=InlineKeyboardMarkup(kb),
     )
 
-
-async def stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    uid_str = str(uid)
-
-    if uid_str in bot_data["active_chats"]:
-        partner_id = int(bot_data["active_chats"][uid_str])
-        await end_chat(uid, partner_id, context)
-        return
-
-    removed = await leave_queue(uid)
-
-    if removed:
-        await update.message.reply_text("✅ Removed from queue", reply_markup=MAIN_MENU)
-    else:
-        await update.message.reply_text("ℹ️ Not in queue/chat", reply_markup=MAIN_MENU)
-
-
-async def leave(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await stop(update, context)
-
-# ===================== CALLBACKS =====================
-
-async def handle_registration(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ===================== GENDER =====================
+async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
     gender = q.data.split("_")[1]
     uid = q.from_user.id
-    uid_str = str(uid)
 
-    bot_data["users"].setdefault(uid_str, {})
-    bot_data["users"][uid_str]["gender"] = gender
-
-    await save_data(bot_data)
+    users.setdefault(uid, {})
+    users[uid]["gender"] = gender
 
     await q.edit_message_text(f"✅ Registered as {gender.capitalize()}")
-    await context.bot.send_message(uid, "Ready!", reply_markup=MAIN_MENU)
 
+    await context.bot.send_message(uid, "Ready 😎", reply_markup=MAIN_MENU)
 
-async def chat_buttons_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ===================== PROFILE =====================
+async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    u = users.get(uid)
+
+    if not u:
+        await update.message.reply_text("Use /start first.")
+        return
+
+    text = (
+        "👤 Your Profile\n\n"
+        f"👥 Gender: {u['gender'] or 'Not set'}\n"
+        f"🎂 Age: {u['age'] or 'Not set'}\n"
+        f"🌍 Country: {u['country'] or 'Not set'}"
+    )
+
+    kb = [
+        [InlineKeyboardButton("🎂 Set Age", callback_data="set_age")],
+        [InlineKeyboardButton("🌍 Set Country", callback_data="set_country")],
+    ]
+
+    await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(kb))
+
+# ===================== AGE =====================
+async def ask_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    context.user_data["awaiting_age"] = True
+    await q.edit_message_text("🎂 Send your age")
+
+# ===================== COUNTRY =====================
+COUNTRIES = ["🇮🇳 India", "🇺🇸 USA", "🇬🇧 UK"]
+
+async def ask_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    buttons = [
+        [InlineKeyboardButton(c, callback_data=f"country_{c}")]
+        for c in COUNTRIES
+    ]
+
+    await q.edit_message_text(
+        "🌍 Select country:",
+        reply_markup=InlineKeyboardMarkup(buttons)
+    )
+
+async def save_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
 
     uid = q.from_user.id
-    uid_str = str(uid)
+    country = q.data.replace("country_", "")
+    users[uid]["country"] = country
 
-    if uid_str not in bot_data["active_chats"]:
-        await q.message.reply_text("❌ Chat expired", reply_markup=MAIN_MENU)
+    await q.edit_message_text(f"🌍 Country saved: {country}")
+
+# ===================== FIND PARTNER =====================
+async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    await find_logic(uid, context)
+
+async def find_logic(uid, context):
+    u = users.get(uid)
+
+    if not u or not u.get("gender"):
+        await context.bot.send_message(uid, "❗ Use /start first")
         return
 
-    partner_id = int(bot_data["active_chats"][uid_str])
+    if uid in active:
+        await context.bot.send_message(uid, "⚠️ Already chatting")
+        return
 
-    if q.data == "chat_exit":
-        await end_chat(uid, partner_id, context)
+    queue = female_queue if u["gender"] == "male" else male_queue
+    my_queue = male_queue if u["gender"] == "male" else female_queue
 
-    elif q.data == "chat_next":
-        await end_chat(uid, partner_id, context)
-        await find_partner_logic(uid, context)
+    if queue:
+        partner = queue.pop(0)
 
-# ===================== MESSAGES =====================
+        active[uid] = partner
+        active[partner] = uid
 
-async def message_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await show_match(uid, partner, context)
+        await show_match(partner, uid, context)
+    else:
+        if uid not in my_queue:
+            my_queue.append(uid)
+
+        await context.bot.send_message(uid, "⏳ Searching for partner...")
+
+# ===================== MATCH MESSAGE =====================
+async def show_match(uid, partner, context):
+    p = users.get(partner, {})
+
+    card = (
+        "🤝 *Partner Found!*\n"
+        "━━━━━━━━━━━━━━━\n\n"
+        f"🎂 Age: {p.get('age','Unknown')}\n"
+        f"🌍 Country: {p.get('country','Unknown')}\n\n"
+        "━━━━━━━━━━━━━━━\n"
+        "/next — find new partner\n"
+        "/end — end chat"
+    )
+
+    await context.bot.send_message(uid, card, parse_mode="Markdown")
+
+# ===================== DISCONNECT MESSAGE =====================
+async def disconnect_message(uid, context):
+    text = (
+        "🚫 *Your partner has disconnected.*\n\n"
+        "Want to meet someone new? 😌"
+    )
+
+    await context.bot.send_message(
+        uid,
+        text,
+        reply_markup=find_button(),
+        parse_mode="Markdown"
+    )
+
+# ===================== RELAY =====================
+async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
-    uid_str = str(uid)
+
+    if context.user_data.get("awaiting_age"):
+        try:
+            age = int(update.message.text)
+            users[uid]["age"] = age
+            context.user_data["awaiting_age"] = False
+            await update.message.reply_text("🎂 Age saved ✅")
+        except:
+            await update.message.reply_text("❌ Send number")
+        return
+
+    partner = active.get(uid)
+
+    if partner:
+        await context.bot.send_message(partner, update.message.text)
+
+# ===================== BUTTONS =====================
+async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    await q.answer()
+
+    uid = q.from_user.id
+    action = q.data
+    partner = active.get(uid)
+
+    if action == "find":
+        await find_logic(uid, context)
+
+    if not partner:
+        await q.edit_message_text("❌ Chat already ended")
+        return
+
+    if action == "end":
+        active.pop(partner, None)
+        active.pop(uid, None)
+
+        await disconnect_message(partner, context)
+        await q.edit_message_text("❌ Chat ended")
+
+    elif action == "next":
+        active.pop(partner, None)
+        active.pop(uid, None)
+
+        await disconnect_message(partner, context)
+        await q.edit_message_text("⏭ Finding new partner...")
+        await find_logic(uid, context)
+
+# ===================== ROUTER =====================
+async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if text == "⚡ Find a partner":
-        await find_partner_logic(uid, context)
-        return
-
-    if text == "👤 My Profile":
-        gender = bot_data["users"].get(uid_str, {}).get("gender", "Not set")
-        await update.message.reply_text(f"👤 Gender: {gender}")
-        return
-
-    if uid_str in bot_data["active_chats"]:
-        partner_id = int(bot_data["active_chats"][uid_str])
-        await context.bot.send_message(partner_id, text)
+    if text == "⚡ Find Partner":
+        await find_partner(update, context)
+    elif text == "👤 My Profile":
+        await my_profile(update, context)
     else:
-        await update.message.reply_text("Click Find Partner")
+        await relay(update, context)
 
-# ===================== MAIN =====================
+# ===================== APP =====================
+app = ApplicationBuilder().token(TOKEN).build()
 
-if __name__ == "__main__":
-    app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CallbackQueryHandler(set_gender, pattern="^gender_"))
+app.add_handler(CallbackQueryHandler(ask_age, pattern="^set_age$"))
+app.add_handler(CallbackQueryHandler(ask_country, pattern="^set_country$"))
+app.add_handler(CallbackQueryHandler(save_country, pattern="^country_"))
+app.add_handler(CallbackQueryHandler(buttons))
 
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("stop", stop))
-    app.add_handler(CommandHandler("leave", leave))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 
-    app.add_handler(CallbackQueryHandler(handle_registration, pattern="^reg_"))
-    app.add_handler(CallbackQueryHandler(chat_buttons_handler, pattern="^chat_"))
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_router))
-
-    logger.info("🔥 DateMate Running...")
-    app.run_polling()
-
+print("🔥 DateMate Running...")
+app.run_polling()
