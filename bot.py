@@ -2,13 +2,15 @@ import os
 import json
 import logging
 import asyncio
-from pathlib import Path
+from datetime import datetime, timedelta
+
 from telegram import (
     Update,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     ReplyKeyboardMarkup,
 )
+
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -18,223 +20,293 @@ from telegram.ext import (
     filters,
 )
 
+# ================= CONFIG =================
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TOKEN")
-
 if not TOKEN:
-    raise ValueError("TOKEN missing")
+    raise ValueError("TOKEN environment variable is not set!")
 
-DATA_FILE = Path("datemate_data.json")
-_save_lock = asyncio.Lock()
-_match_lock = asyncio.Lock()
+DATA_FILE = "datemate_data.json"
+lock = asyncio.Lock()
 
+# ================= DATA =================
 
 def load_data():
-    if DATA_FILE.exists():
-        try:
-            with open(DATA_FILE, "r") as f:
-                return json.load(f)
-        except:
-            pass
-    return {
-        "users": {},
-        "active_chats": {},
-        "queue": []
-    }
+    try:
+        with open(DATA_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {
+            "users": {},
+            "queue": [],
+            "active": {},
+            "reports": {},
+            "bans": {},
+        }
 
-
-async def save_data():
-    async with _save_lock:
+async def save_data(data):
+    async with lock:
         with open(DATA_FILE, "w") as f:
-            json.dump(bot_data, f)
-
+            json.dump(data, f)
 
 bot_data = load_data()
 
-MENU = ReplyKeyboardMarkup(
-    [["⚡ Find Partner", "👤 My Profile"]],
+# ================= MENUS =================
+
+MAIN_MENU = ReplyKeyboardMarkup(
+    [["⚡ Find Partner"], ["👤 Profile", "⚙ Settings"]],
     resize_keyboard=True
 )
-
 
 def chat_buttons():
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("⏭ NEXT", callback_data="next"),
-            InlineKeyboardButton("❌ EXIT", callback_data="exit"),
+            InlineKeyboardButton("❌ STOP", callback_data="stop"),
         ]
     ])
 
+def profile_buttons():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🎂 Set Age", callback_data="set_age")],
+        [InlineKeyboardButton("🚻 Set Gender", callback_data="set_gender")],
+        [InlineKeyboardButton("🌍 Set Country", callback_data="set_country")],
+    ])
 
-# ===================== START =====================
+def settings_buttons():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("💎 Match Male Only (Premium)", callback_data="premium")],
+        [InlineKeyboardButton("💎 Match Female Only (Premium)", callback_data="premium")],
+        [InlineKeyboardButton("🚨 Report User", callback_data="report")],
+    ])
+
+# ================= HELPERS =================
+
+def is_banned(uid):
+    ban = bot_data["bans"].get(str(uid))
+    if not ban:
+        return False
+    if datetime.utcnow() > datetime.fromisoformat(ban):
+        bot_data["bans"].pop(str(uid))
+        return False
+    return True
+
+async def ban_user(uid):
+    unban_time = datetime.utcnow() + timedelta(hours=24)
+    bot_data["bans"][str(uid)] = unban_time.isoformat()
+    await save_data(bot_data)
+
+async def end_chat(uid, context, notify=True):
+    uid_str = str(uid)
+
+    if uid_str not in bot_data["active"]:
+        return
+
+    partner = int(bot_data["active"][uid_str])
+
+    bot_data["active"].pop(uid_str, None)
+    bot_data["active"].pop(str(partner), None)
+
+    await save_data(bot_data)
+
+    if notify:
+        try:
+            await context.bot.send_message(
+                partner,
+                "🚫 Your partner has disconnected.\n\nClick ⚡ Find Partner to continue.",
+                reply_markup=MAIN_MENU
+            )
+        except:
+            pass
+
+async def find_partner(uid, context):
+    uid_str = str(uid)
+
+    if is_banned(uid):
+        ban_time = bot_data["bans"][uid_str]
+        await context.bot.send_message(
+            uid,
+            f"🚫 You are banned until:\n{ban_time}"
+        )
+        return
+
+    if bot_data["queue"]:
+        partner_str = bot_data["queue"].pop(0)
+        partner = int(partner_str)
+
+        bot_data["active"][uid_str] = partner_str
+        bot_data["active"][partner_str] = uid_str
+
+        await save_data(bot_data)
+
+        for user, other in [(uid, partner), (partner, uid)]:
+            other_data = bot_data["users"].get(str(other), {})
+            await context.bot.send_message(
+                user,
+                "🤝 *Partner Found!*\n\n"
+                f"🎂 Age: {other_data.get('age', 'Not set')}\n"
+                f"🚻 Gender: {other_data.get('gender', 'Not set')}\n"
+                f"🌍 Country: {other_data.get('country', 'Not set')}\n\n"
+                "🚫 Links & Media Blocked",
+                reply_markup=chat_buttons(),
+                parse_mode="Markdown"
+            )
+    else:
+        bot_data["queue"].append(uid_str)
+        await save_data(bot_data)
+
+        await context.bot.send_message(
+            uid,
+            "🔍 Finding partner for you..."
+        )
+
+# ================= COMMANDS =================
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
+    uid = update.effective_user.id
+    uid_str = str(uid)
 
-    uid = str(update.effective_user.id)
-
-    bot_data["users"][uid] = {
+    bot_data["users"][uid_str] = {
         "age": None,
-        "country": None
+        "gender": None,
+        "country": None,
+        "state": None
     }
 
-    await save_data()
+    await save_data(bot_data)
+
+    buttons = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("👦 Male", callback_data="gender_male"),
+            InlineKeyboardButton("👧 Female", callback_data="gender_female"),
+        ]
+    ])
 
     await update.message.reply_text(
-        "👋 Welcome to DateMate ❤️",
-        reply_markup=MENU
+        "👋 Welcome to DateMate ❤️\nSelect your gender:",
+        reply_markup=buttons
     )
 
+async def message_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+    uid_str = str(uid)
+    text = update.message.text
 
-# ===================== FIND PARTNER =====================
-
-async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
+    if is_banned(uid):
+        await update.message.reply_text("🚫 You are banned.")
         return
 
-    uid = str(update.effective_user.id)
+    user = bot_data["users"].get(uid_str)
 
-    if uid in bot_data["active_chats"]:
-        await update.message.reply_text("⚠️ Already chatting")
+    if user.get("state") == "age":
+        user["age"] = text
+        user["state"] = None
+        await save_data(bot_data)
+        await update.message.reply_text("✅ Age saved.", reply_markup=MAIN_MENU)
         return
 
-    async with _match_lock:
+    if user.get("state") == "country":
+        user["country"] = text
+        user["state"] = None
+        await save_data(bot_data)
+        await update.message.reply_text("✅ Country saved.", reply_markup=MAIN_MENU)
+        return
 
-        queue = bot_data["queue"]
+    if text == "⚡ Find Partner":
+        await find_partner(uid, context)
+        return
 
-        if queue and queue[0] != uid:
-            partner = queue.pop(0)
+    if text == "👤 Profile":
+        await update.message.reply_text(
+            f"👤 *Your Profile*\n\n"
+            f"🎂 Age: {user.get('age')}\n"
+            f"🚻 Gender: {user.get('gender')}\n"
+            f"🌍 Country: {user.get('country')}",
+            reply_markup=profile_buttons(),
+            parse_mode="Markdown"
+        )
+        return
 
-            bot_data["active_chats"][uid] = partner
-            bot_data["active_chats"][partner] = uid
+    if text == "⚙ Settings":
+        await update.message.reply_text(
+            "⚙ Settings",
+            reply_markup=settings_buttons()
+        )
+        return
 
-            await save_data()
-
-        else:
-            if uid not in queue:
-                queue.append(uid)
-                await save_data()
-
-            await update.message.reply_text("⏳ Searching...")
+    if uid_str in bot_data["active"]:
+        if "http" in text:
+            await update.message.reply_text("🚫 Links are blocked.")
             return
 
-    # MATCH MESSAGE
-
-    partner = bot_data["active_chats"][uid]
-    p = bot_data["users"].get(partner, {})
-
-    msg = (
-        "🤝 Partner Found!\n\n"
-        f"🎂 Age: {p.get('age','Unknown')}\n"
-        f"🌍 Country: {p.get('country','Unknown')}\n\n"
-        "/next — new partner\n"
-        "/end — end chat"
-    )
-
-    await context.bot.send_message(uid, msg, reply_markup=chat_buttons())
-    await context.bot.send_message(int(partner), msg, reply_markup=chat_buttons())
-
-
-# ===================== RELAY =====================
-
-async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not update.message:
-        return
-
-    uid = str(update.effective_user.id)
-
-    if uid in bot_data["active_chats"]:
-        partner = bot_data["active_chats"][uid]
-
+        partner = int(bot_data["active"][uid_str])
         try:
-            await context.bot.send_message(int(partner), update.message.text)
-        except Exception as e:
-            logger.warning(e)
+            await context.bot.send_message(partner, text)
+        except:
+            await update.message.reply_text("❌ Failed to send.")
 
+# ================= CALLBACKS =================
 
-# ===================== BUTTONS =====================
+async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    q = update.callback_query
+    uid = q.from_user.id
+    uid_str = str(uid)
+    user = bot_data["users"][uid_str]
 
-async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
+    await q.answer()
 
-    if not query:
-        return
+    if q.data.startswith("gender_"):
+        gender = q.data.split("_")[1]
+        user["gender"] = gender
+        await save_data(bot_data)
 
-    await query.answer()
+        await q.edit_message_text(f"✅ Registered as {gender}")
+        await context.bot.send_message(uid, "Ready!", reply_markup=MAIN_MENU)
 
-    uid = str(query.from_user.id)
+    elif q.data == "set_age":
+        user["state"] = "age"
+        await save_data(bot_data)
+        await context.bot.send_message(uid, "Enter your age:")
 
-    if uid not in bot_data["active_chats"]:
-        await query.edit_message_text("Session expired ❌")
-        return
+    elif q.data == "set_country":
+        user["state"] = "country"
+        await save_data(bot_data)
+        await context.bot.send_message(uid, "Enter your country:")
 
-    partner = bot_data["active_chats"][uid]
+    elif q.data == "premium":
+        await context.bot.send_message(uid, "💎 Premium required.")
 
-    if query.data == "exit":
+    elif q.data == "next":
+        await end_chat(uid, context)
+        await find_partner(uid, context)
 
-        bot_data["active_chats"].pop(uid, None)
-        bot_data["active_chats"].pop(partner, None)
+    elif q.data == "stop":
+        await end_chat(uid, context)
 
-        await save_data()
+    elif q.data == "report":
+        if uid_str not in bot_data["active"]:
+            return
 
-        await context.bot.send_message(int(partner),
-            "🚫 Your partner has disconnected.\n\n⚡ Find Partner",
-            reply_markup=MENU
-        )
+        partner = bot_data["active"][uid_str]
+        bot_data["reports"][partner] = bot_data["reports"].get(partner, 0) + 1
 
-        await query.edit_message_text("Chat ended ❌")
+        if bot_data["reports"][partner] >= 10:
+            await ban_user(int(partner))
 
-    elif query.data == "next":
+        await save_data(bot_data)
+        await context.bot.send_message(uid, "🚨 User reported.")
 
-        bot_data["active_chats"].pop(uid, None)
-        bot_data["active_chats"].pop(partner, None)
+# ================= MAIN =================
 
-        await save_data()
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(TOKEN).build()
 
-        await context.bot.send_message(int(partner),
-            "⏭ Partner skipped.\n\n⚡ Find Partner",
-            reply_markup=MENU
-        )
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_router))
+    app.add_handler(CallbackQueryHandler(callback_handler))
 
-        await query.edit_message_text("⏳ Finding new partner...")
-        await find_partner_logic(uid, context)
-
-
-async def find_partner_logic(uid, context):
-    fake_update = Update(update_id=0, message=None)
-    await context.bot.send_message(int(uid), "Click ⚡ Find Partner")
-
-
-# ===================== ROUTER =====================
-
-async def router(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    if update.message:
-
-        text = update.message.text
-
-        if text == "⚡ Find Partner":
-            await find_partner(update, context)
-        elif text == "👤 My Profile":
-            await update.message.reply_text("Profile coming soon 😎")
-        else:
-            await relay(update, context)
-
-
-# ===================== APP =====================
-
-app = ApplicationBuilder().token(TOKEN).build()
-
-app.add_handler(CommandHandler("start", start))
-
-app.add_handler(CallbackQueryHandler(buttons))
-
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, router))
-
-app.add_handler(MessageHandler(filters.ALL & ~filters.TEXT, lambda u,c: None))
-
-print("🔥 RUNNING")
-app.run_polling()
+    logger.info("🔥 Bot Running...")
+    app.run_polling()
