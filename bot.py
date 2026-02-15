@@ -12,15 +12,14 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
-import uuid
 
 TOKEN = "7568782062:AAF-abA22OoC2icewtwKROXS8kIWulCGO6k"
 
 # ===================== DATA =====================
-users = {}              # uid -> profile
+users = {}
 male_queue = []
 female_queue = []
-active = {}             # uid -> partner uid
+active = {}
 
 COUNTRIES = [
     "🇮🇳 India", "🇺🇸 USA", "🇬🇧 UK", "🇨🇦 Canada", "🇦🇺 Australia",
@@ -49,22 +48,20 @@ def chat_buttons():
 # ===================== START =====================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
+
     users[uid] = {
         "gender": None,
         "age": None,
         "country": None,
     }
 
-    kb = [
-        [
-            InlineKeyboardButton("👦 Male", callback_data="gender_male"),
-            InlineKeyboardButton("👧 Female", callback_data="gender_female"),
-        ]
-    ]
+    kb = [[
+        InlineKeyboardButton("👦 Male", callback_data="gender_male"),
+        InlineKeyboardButton("👧 Female", callback_data="gender_female"),
+    ]]
 
     await update.message.reply_text(
-        "👋 **Welcome to DateMate ❤️**\n\n"
-        "Please select your gender:",
+        "👋 **Welcome to DateMate ❤️**\n\nPlease select your gender:",
         reply_markup=InlineKeyboardMarkup(kb),
         parse_mode="Markdown",
     )
@@ -81,9 +78,10 @@ async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
     users[uid]["gender"] = gender
 
     await q.edit_message_text(
-        f"✅ **Gender saved:** {gender.capitalize()}\n\n👇 Use the menu below",
+        f"✅ **Gender saved:** {gender.capitalize()}",
         parse_mode="Markdown",
     )
+
     await context.bot.send_message(uid, "Ready to go 🚀", reply_markup=MAIN_MENU)
 
 # ===================== PROFILE =====================
@@ -117,6 +115,7 @@ async def my_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_age(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     context.user_data["awaiting_age"] = True
     await q.edit_message_text("🎂 Send your age (e.g. 18, 21, 25)")
 
@@ -139,6 +138,7 @@ async def ask_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def save_country(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     uid = q.from_user.id
     country = q.data.replace("country_", "")
     users[uid]["country"] = country
@@ -163,25 +163,29 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if queue:
         partner = queue.pop(0)
+
         active[uid] = partner
         active[partner] = uid
 
         await show_match(uid, partner, context)
         await show_match(partner, uid, context)
     else:
-        my_queue.append(uid)
+        if uid not in my_queue:
+            my_queue.append(uid)
+
         await update.message.reply_text("⏳ Waiting for a partner...")
 
 # ===================== MATCH UI =====================
 async def show_match(uid, partner, context):
     p = users.get(partner, {})
+
     card = (
         "✅ **Partner Matched!**\n\n"
         f"👥 Gender: {p.get('gender','Unknown')}\n"
         f"🎂 Age: {p.get('age','Unknown')}\n"
         f"🌍 Country: {p.get('country','Unknown')}\n\n"
-        "🔒 Links blocked\n"
-        "⏳ Media allowed after 2 minutes"
+        "🚫 Media disabled\n"
+        "💬 Text messages only"
     )
 
     await context.bot.send_message(
@@ -206,13 +210,22 @@ async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     partner = active.get(uid)
+
     if partner:
         await context.bot.send_message(partner, update.message.text)
+
+# ===================== MEDIA BLOCK =====================
+async def block_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    uid = update.effective_user.id
+
+    if uid in active:
+        await update.message.reply_text("🚫 Only text messages allowed")
 
 # ===================== BUTTONS =====================
 async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
+
     uid = q.from_user.id
     action = q.data
     partner = active.get(uid)
@@ -221,6 +234,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if partner:
             active.pop(partner, None)
             await context.bot.send_message(partner, "❌ Partner left the chat")
+
         active.pop(uid, None)
         await q.edit_message_text("You exited the chat ❌")
 
@@ -231,9 +245,7 @@ async def buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
             active.pop(uid, None)
 
         await q.edit_message_text("⏳ Finding new partner...")
-        fake = Update(update.update_id, message=q.message)
-        fake.message.from_user = q.from_user
-        await find_partner(fake, context)
+        await find_partner(update, context)
 
 # ===================== ROUTER =====================
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -257,7 +269,12 @@ app.add_handler(CallbackQueryHandler(ask_age, pattern="^set_age$"))
 app.add_handler(CallbackQueryHandler(ask_country, pattern="^set_country$"))
 app.add_handler(CallbackQueryHandler(save_country, pattern="^country_"))
 app.add_handler(CallbackQueryHandler(buttons, pattern="^(next|exit)$"))
+
+# TEXT ONLY
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
+
+# BLOCK EVERYTHING ELSE
+app.add_handler(MessageHandler(~filters.TEXT, block_media))
 
 print("🔥 DateMate bot running...")
 app.run_polling()
