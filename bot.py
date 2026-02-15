@@ -38,13 +38,12 @@ def run_flask():
 
 # ================= DATA =================
 users = {}
-male_queue = []
-female_queue = []
+global_queue = []
 active_chats = {}
 
 COUNTRIES = [
-    "🇮🇳 India", "🇺🇸 USA", "🇬🇧 UK", "🇨🇦 Canada",
-    "🇦🇺 Australia", "🇩🇪 Germany", "🇫🇷 France"
+    "🇮🇳 India", "🇺🇸 USA", "🇬🇧 UK",
+    "🇨🇦 Canada", "🇦🇺 Australia"
 ]
 
 # ================= UI =================
@@ -164,7 +163,7 @@ async def callbacks(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "reconnect":
         await find_partner(uid, context)
 
-# ================= MATCHING =================
+# ================= MATCHING (GLOBAL) =================
 async def find_partner(uid, context):
     u = users.get(uid)
 
@@ -176,11 +175,8 @@ async def find_partner(uid, context):
         await context.bot.send_message(uid, "⚠️ Already in chat.")
         return
 
-    target_queue = female_queue if u["gender"] == "male" else male_queue
-    my_queue = male_queue if u["gender"] == "male" else female_queue
-
-    if target_queue:
-        partner = target_queue.pop(0)
+    if global_queue:
+        partner = global_queue.pop(0)
 
         active_chats[uid] = partner
         active_chats[partner] = uid
@@ -189,8 +185,8 @@ async def find_partner(uid, context):
         await show_match(partner, uid, context)
 
     else:
-        if uid not in my_queue:
-            my_queue.append(uid)
+        if uid not in global_queue:
+            global_queue.append(uid)
 
         await context.bot.send_message(uid, "⏳ Searching for partner...")
 
@@ -199,17 +195,13 @@ async def show_match(uid, partner, context):
 
     card = (
         "🤝 Partner Found!\n\n"
-        f"🎂 Age: {p.get('age','Unknown')} \n"
+        f"🎂 Age: {p.get('age','Unknown')}\n"
         f"🌍 Country: {p.get('country','Unknown')}\n\n"
-        "/next — find new partner\n"
+        "/next — new partner\n"
         "/end — end chat"
     )
 
-    await context.bot.send_message(
-        uid,
-        card,
-        reply_markup=chat_buttons()
-    )
+    await context.bot.send_message(uid, card, reply_markup=chat_buttons())
 
 # ================= CHAT CONTROL =================
 async def handle_next(uid, context):
