@@ -1,297 +1,276 @@
 import os
-from datetime import datetime, timedelta
-from telegram import Update, ReplyKeyboardMarkup
+import logging
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove
+)
 from telegram.ext import (
-    ApplicationBuilder,
-    ContextTypes,
+    Application,
     CommandHandler,
     MessageHandler,
     filters,
+    ContextTypes
 )
+
+logging.basicConfig(level=logging.INFO)
 
 TOKEN = os.environ.get("TOKEN")
 
+if not TOKEN:
+    raise ValueError("TOKEN not set in Render!")
+
+# ====== MEMORY ======
+users = {}
 waiting_users = []
 active_chats = {}
-profiles = {}
-reports = {}
-banned_users = {}
 
-# ================= MENUS =================
+# ====== KEYBOARDS ======
 
-MAIN_MENU = ReplyKeyboardMarkup(
-    [["⚡ Find Partner", "👤 My Profile"],
-     ["⚙ Settings"]],
+gender_keyboard = ReplyKeyboardMarkup(
+    [["👨 Male", "👩 Female"]],
     resize_keyboard=True
 )
 
-GENDER_MENU = ReplyKeyboardMarkup(
-    [["👦 Male", "👧 Female"]],
+main_keyboard = ReplyKeyboardMarkup(
+    [["🔍 Find Partner"],
+     ["👤 Profile", "⚙ Settings"]],
     resize_keyboard=True
 )
 
-PROFILE_MENU = ReplyKeyboardMarkup(
-    [["🎂 Set Age", "🌍 Set Country"],
-     ["🚻 Set Gender"],
+chat_keyboard = ReplyKeyboardMarkup(
+    [["➡ Next", "⛔ Stop"]],
+    resize_keyboard=True
+)
+
+settings_keyboard = ReplyKeyboardMarkup(
+    [["💎 Premium"],
+     ["🚫 Report"],
+     ["👤 Profile"]],
+    resize_keyboard=True
+)
+
+premium_keyboard = ReplyKeyboardMarkup(
+    [["👨 Match Male (Premium)"],
+     ["👩 Match Female (Premium)"]],
+    resize_keyboard=True
+)
+
+profile_keyboard = ReplyKeyboardMarkup(
+    [["🎂 Set Age"],
+     ["🌍 Set Country"],
      ["🔙 Back"]],
     resize_keyboard=True
 )
 
-SETTINGS_MENU = ReplyKeyboardMarkup(
-    [["💎 Match with Male", "💎 Match with Female"],
-     ["🚫 Report User"],
-     ["🔙 Back"]],
-    resize_keyboard=True
-)
+# ====== HELPERS ======
 
-CHAT_MENU = ReplyKeyboardMarkup(
-    [["⏭ Next", "❌ End"]],
-    resize_keyboard=True
-)
+def get_partner(user_id):
+    return active_chats.get(user_id)
 
-COUNTRIES = ["India", "USA", "UK", "Canada", "Australia"]
+async def disconnect(user_id, context):
+    partner = get_partner(user_id)
 
-COUNTRY_MENU = ReplyKeyboardMarkup(
-    [[c] for c in COUNTRIES] + [["🔙 Back"]],
-    resize_keyboard=True
-)
-
-# ================= HELPERS =================
-
-def is_banned(user_id):
-    if user_id not in banned_users:
-        return False
-
-    if datetime.now() > banned_users[user_id]:
-        del banned_users[user_id]
-        return False
-
-    return True
-
-
-def profile_complete(user_id):
-    p = profiles.get(user_id)
-    return p and p.get("gender") and p.get("age") and p.get("country")
-
-
-async def disconnect(bot, user_id):
-    await bot.send_message(
-        user_id,
-        "🚫 Your partner has disconnected.\n\n⚡ Find Partner to continue",
-        reply_markup=MAIN_MENU
-    )
-
-# ================= START =================
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    if is_banned(user_id):
-        expiry = banned_users[user_id]
-        await update.message.reply_text(
-            f"🚫 You are banned until:\n{expiry.strftime('%d %B %Y %H:%M')}"
-        )
-        return
-
-    profiles[user_id] = {}
-
-    await update.message.reply_text(
-        "🔥 Welcome to DateMate!\n\nSelect your gender:",
-        reply_markup=GENDER_MENU
-    )
-
-# ================= PROFILE =================
-
-async def show_profile(update, context):
-    user_id = update.effective_user.id
-    p = profiles.get(user_id, {})
-
-    await update.message.reply_text(
-        "👤 Your Profile\n\n"
-        f"🎂 Age: {p.get('age', 'Not set')}\n"
-        f"🚻 Gender: {p.get('gender', 'Not set')}\n"
-        f"🌍 Country: {p.get('country', 'Not set')}",
-        reply_markup=PROFILE_MENU
-    )
-
-# ================= MATCHING =================
-
-async def find_partner(update, context):
-    user_id = update.effective_user.id
-
-    if not profile_complete(user_id):
-        await update.message.reply_text("🚫 Complete profile first")
-        return
-
-    if user_id in waiting_users:
-        return
-
-    waiting_users.append(user_id)
-
-    await update.message.reply_text("⏳ Searching for partner...")
-
-    if len(waiting_users) >= 2:
-        u1 = waiting_users.pop(0)
-        u2 = waiting_users.pop(0)
-
-        active_chats[u1] = u2
-        active_chats[u2] = u1
-
-        for u, partner in [(u1, u2), (u2, u1)]:
-            p = profiles.get(partner)
-
-            await context.bot.send_message(
-                u,
-                "🤝 Partner Found!\n\n"
-                f"🎂 Age: {p.get('age')}\n"
-                f"🌍 Country: {p.get('country')}\n\n"
-                "🚫 Links & Media Blocked",
-                reply_markup=CHAT_MENU
-            )
-
-# ================= CHAT CONTROL =================
-
-async def next_chat(update, context):
-    user_id = update.effective_user.id
-    partner = active_chats.get(user_id)
-
-    if not partner:
-        return
-
-    del active_chats[user_id]
-    del active_chats[partner]
-
-    await disconnect(context.bot, partner)
-    await find_partner(update, context)
-
-
-async def end_chat(update, context):
-    user_id = update.effective_user.id
-    partner = active_chats.get(user_id)
-
-    if not partner:
-        return
-
-    del active_chats[user_id]
-    del active_chats[partner]
-
-    await disconnect(context.bot, partner)
-
-    await update.message.reply_text("❌ Chat Ended", reply_markup=MAIN_MENU)
-
-# ================= REPORT =================
-
-async def report_user(update, context):
-    user_id = update.effective_user.id
-    partner = active_chats.get(user_id)
-
-    if not partner:
-        await update.message.reply_text("🚫 Not in chat")
-        return
-
-    reports[partner] = reports.get(partner, 0) + 1
-
-    await update.message.reply_text("✅ User Reported")
-
-    if reports[partner] >= 10:
-        banned_users[partner] = datetime.now() + timedelta(hours=24)
-        del reports[partner]
+    if partner:
+        del active_chats[partner]
+        del active_chats[user_id]
 
         await context.bot.send_message(
             partner,
-            "🚫 You are banned for 24 hours.\n\nRules violation detected."
+            "🚫 Your partner has disconnected.\n\n🔍 Click Find Partner to continue.",
+            reply_markup=main_keyboard
         )
 
-# ================= MESSAGE HANDLER =================
+# ====== COMMANDS ======
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.chat_id
+
+    users[user_id] = {
+        "gender": None,
+        "age": None,
+        "country": None,
+        "premium": False
+    }
+
+    await update.message.reply_text(
+        "🔥 Welcome!\n\nSelect your gender:",
+        reply_markup=gender_keyboard
+    )
+
+async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.chat_id
+
+    await disconnect(user_id, context)
+
+    if user_id not in waiting_users:
+        waiting_users.append(user_id)
+
+    await update.message.reply_text(
+        "🔍 Finding partner for you...",
+        reply_markup=ReplyKeyboardRemove()
+    )
+
+    if len(waiting_users) >= 2:
+        user1 = waiting_users.pop(0)
+        user2 = waiting_users.pop(0)
+
+        active_chats[user1] = user2
+        active_chats[user2] = user1
+
+        msg = (
+            "🤝 Partner Found!\n\n"
+            "🚫 Links are blocked\n"
+            "🚫 No media allowed"
+        )
+
+        await context.bot.send_message(user1, msg, reply_markup=chat_keyboard)
+        await context.bot.send_message(user2, msg, reply_markup=chat_keyboard)
+
+async def next_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.chat_id
+    await find_partner(update, context)
+
+async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.chat_id
+    await disconnect(user_id, context)
+
+    await update.message.reply_text(
+        "⛔ Chat ended.",
+        reply_markup=main_keyboard
+    )
+
+# ====== PROFILE ======
+
+async def open_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.chat_id
+    user = users[user_id]
+
+    profile_text = (
+        "👤 Your Profile\n\n"
+        f"Gender: {user['gender'] or 'Not set'}\n"
+        f"Age: {user['age'] or 'Not set'}\n"
+        f"Country: {user['country'] or 'Not set'}"
+    )
+
+    await update.message.reply_text(
+        profile_text,
+        reply_markup=profile_keyboard
+    )
+
+# ====== SETTINGS ======
+
+async def open_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "⚙ Settings\n\nSelect option:",
+        reply_markup=settings_keyboard
+    )
+
+# ====== MESSAGES ======
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-
-    if is_banned(user_id):
-        return
-
-    if update.message.photo or update.message.video or update.message.sticker:
-        await update.message.reply_text("🚫 Only text allowed")
-        return
-
+    user_id = update.message.chat_id
     text = update.message.text
 
-    # ===== Gender Selection =====
-    if text in ["👦 Male", "👧 Female"]:
-        profiles[user_id]["gender"] = text.replace("👦 ", "").replace("👧 ", "")
-        await update.message.reply_text("🎂 Send your age:")
-        context.user_data["awaiting_age"] = True
+    if user_id not in users:
         return
 
-    # ===== Age Input =====
-    if context.user_data.get("awaiting_age"):
-        profiles[user_id]["age"] = text
-        context.user_data["awaiting_age"] = False
+    user = users[user_id]
+    partner = get_partner(user_id)
+
+    # ===== GENDER SELECTION =====
+    if text in ["👨 Male", "👩 Female"]:
+        user["gender"] = text.replace("👨 ", "").replace("👩 ", "")
 
         await update.message.reply_text(
-            "🌍 Select your country:",
-            reply_markup=COUNTRY_MENU
+            "✅ Gender saved!",
+            reply_markup=main_keyboard
         )
         return
 
-    # ===== Country Selection =====
-    if text in COUNTRIES:
-        profiles[user_id]["country"] = text
-        await update.message.reply_text(
-            "✅ Profile Saved!",
-            reply_markup=MAIN_MENU
-        )
-        return
-
-    # ===== Main Menu =====
-    if text == "⚡ Find Partner":
+    # ===== MAIN MENU =====
+    if text == "🔍 Find Partner":
         await find_partner(update, context)
         return
 
-    if text == "👤 My Profile":
-        await show_profile(update, context)
+    if text == "👤 Profile":
+        await open_profile(update, context)
         return
 
     if text == "⚙ Settings":
+        await open_settings(update, context)
+        return
+
+    # ===== PROFILE SETTINGS =====
+    if text == "🎂 Set Age":
+        context.user_data["setting_age"] = True
+        await update.message.reply_text("Enter your age:")
+        return
+
+    if context.user_data.get("setting_age"):
+        user["age"] = text
+        context.user_data["setting_age"] = False
+
         await update.message.reply_text(
-            "⚙ Settings",
-            reply_markup=SETTINGS_MENU
+            "🎂 Age saved!",
+            reply_markup=profile_keyboard
         )
         return
 
-    # ===== Settings =====
-    if text.startswith("💎"):
-        await update.message.reply_text("💎 Premium Required")
+    if text == "🌍 Set Country":
+        context.user_data["setting_country"] = True
+        await update.message.reply_text("Enter your country:")
         return
 
-    if text == "🚫 Report User":
-        await report_user(update, context)
+    if context.user_data.get("setting_country"):
+        user["country"] = text
+        context.user_data["setting_country"] = False
+
+        await update.message.reply_text(
+            "🌍 Country saved!",
+            reply_markup=profile_keyboard
+        )
         return
 
     if text == "🔙 Back":
-        await update.message.reply_text("⬅ Back", reply_markup=MAIN_MENU)
+        await update.message.reply_text(
+            "⬅ Back to menu",
+            reply_markup=main_keyboard
+        )
         return
 
-    # ===== Chat Controls =====
-    if text == "⏭ Next":
-        await next_chat(update, context)
+    # ===== SETTINGS =====
+    if text == "💎 Premium":
+        await update.message.reply_text(
+            "💎 Premium Features",
+            reply_markup=premium_keyboard
+        )
         return
 
-    if text == "❌ End":
-        await end_chat(update, context)
+    if "Premium" in text:
+        await update.message.reply_text(
+            "💎 Premium required for this feature."
+        )
         return
 
-    # ===== Chat Relay =====
-    partner = active_chats.get(user_id)
+    if text == "🚫 Report":
+        if partner:
+            await update.message.reply_text("🚫 Partner reported.")
+        else:
+            await update.message.reply_text("No partner to report.")
+        return
+
+    # ===== CHAT FORWARDING =====
     if partner:
         await context.bot.send_message(partner, text)
 
-# ================= MAIN =================
+# ====== RUN ======
 
-app = ApplicationBuilder().token(TOKEN).build()
+app = Application.builder().token(TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.TEXT, handle_message))
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 print("Bot Running...")
-app.run_polling()
+
+app.run_polling(drop_pending_updates=True)
