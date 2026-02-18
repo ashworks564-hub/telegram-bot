@@ -1,8 +1,8 @@
 import os
-import logging
 import psycopg2
 from datetime import datetime, timedelta
-from telegram import ReplyKeyboardMarkup, Update
+from flask import Flask
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -11,69 +11,83 @@ from telegram.ext import (
     filters,
 )
 
-TOKEN = os.getenv("TOKEN")
-DATABASE_URL = os.getenv("DATABASE_URL")
+TOKEN = os.environ.get("TOKEN")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-logging.basicConfig(level=logging.INFO)
-
-# ---------- DATABASE CONNECTION ----------
-
-conn = psycopg2.connect(DATABASE_URL, sslmode='require')
+conn = psycopg2.connect(DATABASE_URL, sslmode="require")
 cur = conn.cursor()
 
 cur.execute("""
 CREATE TABLE IF NOT EXISTS users (
     user_id BIGINT PRIMARY KEY,
     gender TEXT,
-    partner BIGINT,
     reports INT DEFAULT 0,
-    banned_until TIMESTAMP,
-    premium BOOLEAN DEFAULT FALSE
+    banned_until TIMESTAMP
 )
 """)
 conn.commit()
 
-# ---------- KEYBOARDS ----------
+waiting_queue = []
+active_chats = {}
+last_partner = {}
 
-main_keyboard = ReplyKeyboardMarkup(
-    [["🔎 Find Partner"], ["👤 Profile", "⚙️ Settings"]],
-    resize_keyboard=True
-)
+# ---------------- KEYBOARDS ----------------
 
 gender_keyboard = ReplyKeyboardMarkup(
-    [["👨 Male", "👩 Female"]],
+    [["👦 Male", "👧 Female"]],
     resize_keyboard=True
 )
 
-settings_keyboard = ReplyKeyboardMarkup(
-    [["🚫 Report"], ["💎 Match with Male", "💎 Match with Female"], ["⬅️ Back"]],
+main_menu = ReplyKeyboardMarkup(
+    [["🔍 Find Partner"], ["👤 Profile", "⚙ Settings"]],
     resize_keyboard=True
 )
 
-after_chat_keyboard = ReplyKeyboardMarkup(
-    [["🔎 Find Partner"]],
+chat_menu = ReplyKeyboardMarkup(
+    [["⏭ Next", "❌ End"]],
     resize_keyboard=True
 )
 
-# ---------- HELPERS ----------
+after_disconnect_menu = ReplyKeyboardMarkup(
+    [["🚨 Report", "⏭ Next"]],
+    resize_keyboard=True
+)
+
+settings_menu = ReplyKeyboardMarkup(
+    [["🚨 Report"], ["💎 Match with Male", "💎 Match with Female"], ["⬅ Back"]],
+    resize_keyboard=True
+)
+
+# ---------------- DATABASE HELPERS ----------------
 
 def get_user(user_id):
-    cur.execute("SELECT * FROM users WHERE user_id = %s", (user_id,))
+    cur.execute("SELECT * FROM users WHERE user_id=%s", (user_id,))
     return cur.fetchone()
 
 def create_user(user_id):
-    cur.execute(
-        "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
-        (user_id,)
-    )
+    cur.execute("INSERT INTO users (user_id) VALUES (%s) ON CONFLICT DO NOTHING", (user_id,))
     conn.commit()
 
-def is_banned(user):
-    if user[4]:
-        return user[4] > datetime.utcnow()
-    return False()
+def set_gender(user_id, gender):
+    cur.execute("UPDATE users SET gender=%s WHERE user_id=%s", (gender, user_id))
+    conn.commit()
 
-# ---------- COMMANDS ----------
+def add_report(user_id):
+    cur.execute("UPDATE users SET reports = reports + 1 WHERE user_id=%s", (user_id,))
+    conn.commit()
+
+def ban_user(user_id):
+    banned_until = datetime.utcnow() + timedelta(hours=24)
+    cur.execute("UPDATE users SET banned_until=%s WHERE user_id=%s", (banned_until, user_id))
+    conn.commit()
+    return banned_until
+
+def is_banned(user):
+    if user[3]:
+        return user[3] > datetime.utcnow()
+    return False
+
+# ---------------- BOT LOGIC ----------------
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -91,175 +105,180 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup=gender_keyboard
         )
     else:
-        await update.message.reply_text(
-            "👋 Welcome back!",
-            reply_markup=main_keyboard
-        )
+        await update.message.reply_text("Main Menu:", reply_markup=main_menu)
 
-# ---------- GENDER ----------
-
-async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    text = update.message.text
-
-    if text not in ["👨 Male", "👩 Female"]:
-        return
-
-    gender = "Male" if "Male" in text else "Female"
-
-    cur.execute(
-        "UPDATE users SET gender = %s WHERE user_id = %s",
-        (gender, user_id)
-    )
-    conn.commit()
-
-    await update.message.reply_text(
-        f"✅ Gender set to {gender}",
-        reply_markup=main_keyboard
-    )
-
-# ---------- FIND PARTNER ----------
+# ---------------- MATCHING ----------------
 
 async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = get_user(user_id)
 
-    if is_banned(user):
-        await update.message.reply_text("🚫 You are banned.")
+    if not user[1]:
+        await update.message.reply_text("⚠ Select gender first.")
         return
 
-    if user[2]:
-        await update.message.reply_text("⚠️ You are already in chat.")
+    if user_id in active_chats:
+        await update.message.reply_text("⚠ Already in chat.")
         return
 
     await update.message.reply_text("🔎 Finding partner for you...")
 
-    cur.execute("""
-    SELECT user_id FROM users
-    WHERE partner IS NULL
-    AND gender IS NOT NULL
-    AND user_id != %s
-    LIMIT 1
-    """, (user_id,))
+    if waiting_queue:
+        partner = waiting_queue.pop(0)
 
-    partner = cur.fetchone()
+        active_chats[user_id] = partner
+        active_chats[partner] = user_id
 
-    if not partner:
-        return
+        last_partner[user_id] = partner
+        last_partner[partner] = user_id
 
-    partner_id = partner[0]
+        await context.bot.send_message(user_id, "🤝 Partner Found!", reply_markup=chat_menu)
+        await context.bot.send_message(partner, "🤝 Partner Found!", reply_markup=chat_menu)
 
-    cur.execute("UPDATE users SET partner = %s WHERE user_id = %s", (partner_id, user_id))
-    cur.execute("UPDATE users SET partner = %s WHERE user_id = %s", (user_id, partner_id))
-    conn.commit()
+    else:
+        waiting_queue.append(user_id)
 
-    await context.bot.send_message(
-        user_id,
-        "🤝 Partner Found!\n\n🚫 Links are blocked\n📵 No media allowed",
-    )
+# ---------------- CHAT CONTROL ----------------
 
-    await context.bot.send_message(
-        partner_id,
-        "🤝 Partner Found!\n\n🚫 Links are blocked\n📵 No media allowed",
-    )
-
-# ---------- CHAT RELAY ----------
-
-async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def next_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user = get_user(user_id)
 
-    if not user[2]:
+    if user_id in active_chats:
+        partner = active_chats[user_id]
+
+        del active_chats[user_id]
+        del active_chats[partner]
+
+        await context.bot.send_message(
+            partner,
+            "🚫 Your partner has disconnected.",
+            reply_markup=after_disconnect_menu
+        )
+
+    await find_partner(update, context)
+
+async def end_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if user_id in active_chats:
+        partner = active_chats[user_id]
+
+        del active_chats[user_id]
+        del active_chats[partner]
+
+        await context.bot.send_message(
+            partner,
+            "🚫 Your partner has disconnected.",
+            reply_markup=after_disconnect_menu
+        )
+
+    await update.message.reply_text("Main Menu:", reply_markup=main_menu)
+
+# ---------------- REPORT ----------------
+
+async def report_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if user_id not in last_partner:
+        await update.message.reply_text("⚠ No partner to report.")
         return
 
-    if "http" in update.message.text.lower():
-        await update.message.reply_text("🚫 Links are blocked.")
-        return
+    reported = last_partner[user_id]
 
-    await context.bot.send_message(user[2], update.message.text)
+    add_report(reported)
+    user = get_user(reported)
 
-# ---------- PROFILE ----------
+    if user[2] >= 10:
+        banned_until = ban_user(reported)
+
+        await context.bot.send_message(
+            reported,
+            f"🚫 You are banned until:\n{banned_until}"
+        )
+
+    await update.message.reply_text("✅ Report submitted.", reply_markup=main_menu)
+
+# ---------------- PROFILE ----------------
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user = get_user(user_id)
 
-    premium = "💎 Premium User" if user[5] else "👤 Free User"
-
     await update.message.reply_text(
-        f"👤 Your Profile\n\n"
-        f"Gender: {user[1]}\n"
-        f"Status: {premium}"
+        f"👤 Your Profile\n\nGender: {user[1]}\nReports: {user[2]}",
+        reply_markup=main_menu
     )
 
-# ---------- SETTINGS ----------
+# ---------------- SETTINGS ----------------
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "⚙️ Settings",
-        reply_markup=settings_keyboard
+        "⚙ Settings\n\nSelect option:",
+        reply_markup=settings_menu
     )
 
-# ---------- PREMIUM ----------
-
-async def premium_required(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("💎 Premium Required")
-
-# ---------- REPORT ----------
-
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    user = get_user(user_id)
+    text = update.message.text
 
-    if not user[2]:
-        await update.message.reply_text("⚠️ No partner to report.")
+    if text == "👦 Male":
+        set_gender(user_id, "Male")
+        await update.message.reply_text("✅ Gender set to Male", reply_markup=main_menu)
         return
 
-    partner_id = user[2]
+    if text == "👧 Female":
+        set_gender(user_id, "Female")
+        await update.message.reply_text("✅ Gender set to Female", reply_markup=main_menu)
+        return
 
-    cur.execute("UPDATE users SET reports = reports + 1 WHERE user_id = %s", (partner_id,))
-    conn.commit()
+    if text == "🔍 Find Partner":
+        await find_partner(update, context)
+        return
 
-    cur.execute("SELECT reports FROM users WHERE user_id = %s", (partner_id,))
-    reports = cur.fetchone()[0]
+    if text == "⏭ Next":
+        await next_partner(update, context)
+        return
 
-    if reports >= 10:
-        banned_until = datetime.utcnow() + timedelta(hours=24)
+    if text == "❌ End":
+        await end_chat(update, context)
+        return
 
-        cur.execute(
-            "UPDATE users SET banned_until = %s WHERE user_id = %s",
-            (banned_until, partner_id)
-        )
-        conn.commit()
+    if text == "🚨 Report":
+        await report_user(update, context)
+        return
 
-        await context.bot.send_message(
-            partner_id,
-            f"🚫 You have been banned for 24 hours."
-        )
+    if text == "👤 Profile":
+        await profile(update, context)
+        return
 
-    await update.message.reply_text("🚫 User reported.")
+    if text == "⚙ Settings":
+        await settings(update, context)
+        return
 
-# ---------- BACK ----------
+    if text.startswith("💎"):
+        await update.message.reply_text("💎 Premium Required")
+        return
 
-async def back(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "⬅️ Back",
-        reply_markup=main_keyboard
-    )
+    if user_id in active_chats:
+        partner = active_chats[user_id]
+        await context.bot.send_message(partner, text)
 
-# ---------- MAIN ----------
+# ---------------- FLASK ----------------
 
-app = ApplicationBuilder().token(TOKEN).build()
+app = Flask(__name__)
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.Regex("👨 Male|👩 Female"), set_gender))
-app.add_handler(MessageHandler(filters.Regex("🔎 Find Partner"), find_partner))
-app.add_handler(MessageHandler(filters.Regex("👤 Profile"), profile))
-app.add_handler(MessageHandler(filters.Regex("⚙️ Settings"), settings))
-app.add_handler(MessageHandler(filters.Regex("💎"), premium_required))
-app.add_handler(MessageHandler(filters.Regex("🚫 Report"), report))
-app.add_handler(MessageHandler(filters.Regex("⬅️ Back"), back))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
+@app.route('/')
+def home():
+    return "Bot Running"
 
-print("Bot Running...")
-app.run_polling()
+# ---------------- MAIN ----------------
+
+if __name__ == "__main__":
+    application = ApplicationBuilder().token(TOKEN).build()
+
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
+
+    print("Bot Running...")
+
+    application.run_polling()
