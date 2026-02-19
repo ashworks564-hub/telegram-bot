@@ -1,16 +1,23 @@
+import logging
 import os
-import threading
+import random
 from flask import Flask
-from telegram import Update, ReplyKeyboardMarkup
+import threading
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
+    CallbackQueryHandler,
     MessageHandler,
-    filters,
     ContextTypes,
+    filters,
 )
 
-# ---------------- FLASK (Render Keep Alive) ----------------
+TOKEN = os.getenv("TOKEN")
+
+logging.basicConfig(level=logging.INFO)
+
+# ---------------- FLASK SERVER ---------------- #
 
 app_flask = Flask(__name__)
 
@@ -24,200 +31,240 @@ def run_flask():
 
 threading.Thread(target=run_flask).start()
 
-# ---------------- BOT LOGIC ----------------
-
-TOKEN = os.environ.get("TOKEN")
+# ---------------- BOT DATA ---------------- #
 
 waiting_users = []
 active_chats = {}
 user_gender = {}
+user_reports = {}
 
-# ---------------- KEYBOARDS ----------------
+BAN_LIMIT = 10
 
-def main_keyboard():
-    return ReplyKeyboardMarkup(
-        [["🔎 Find Partner", "👤 Profile"]],
-        resize_keyboard=True
-    )
+# ---------------- HELPERS ---------------- #
 
-def gender_keyboard():
-    return ReplyKeyboardMarkup(
-        [["👨 Male", "👩 Female"]],
-        resize_keyboard=True
-    )
+def get_main_menu():
+    keyboard = [
+        [InlineKeyboardButton("🔎 Find Partner", callback_data="find")],
+        [InlineKeyboardButton("👤 Profile", callback_data="profile")],
+        [InlineKeyboardButton("⚙ Settings", callback_data="settings")],
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-def chat_keyboard():
-    return ReplyKeyboardMarkup(
-        [["⏭ Next", "❌ End"]],
-        resize_keyboard=True
-    )
+def get_chat_controls():
+    keyboard = [
+        [
+            InlineKeyboardButton("⏭ Next", callback_data="next"),
+            InlineKeyboardButton("❌ End", callback_data="end"),
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
 
-# ---------------- MATCHING ENGINE ----------------
+def is_banned(user_id):
+    return user_reports.get(user_id, 0) >= BAN_LIMIT
 
-def find_partner(user_id):
-
-    if user_id in waiting_users:
-        return None
-
-    for partner_id in waiting_users:
-        if partner_id != user_id:
-
-            waiting_users.remove(partner_id)
-
-            active_chats[user_id] = partner_id
-            active_chats[partner_id] = user_id
-
-            return partner_id
-
-    waiting_users.append(user_id)
-    return None
-
-def end_chat(user_id):
-
-    if user_id not in active_chats:
-        return None
-
-    partner_id = active_chats.pop(user_id)
-    active_chats.pop(partner_id, None)
-
-    return partner_id
-
-# ---------------- HANDLERS ----------------
+# ---------------- COMMANDS ---------------- #
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
     user_id = update.effective_user.id
 
-    await update.message.reply_text(
-        "👋 Welcome!\n\nPlease select your gender:",
-        reply_markup=gender_keyboard()
-    )
-
-async def handle_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-    text = update.message.text
-
-    if "Male" in text:
-        user_gender[user_id] = "Male"
-    elif "Female" in text:
-        user_gender[user_id] = "Female"
-    else:
+    if is_banned(user_id):
+        await update.message.reply_text("🚫 You are banned.")
         return
 
+    keyboard = [
+        [
+            InlineKeyboardButton("👦 Male", callback_data="gender_male"),
+            InlineKeyboardButton("👧 Female", callback_data="gender_female"),
+        ]
+    ]
+
     await update.message.reply_text(
-        f"✅ Gender set to {user_gender[user_id]}",
-        reply_markup=main_keyboard()
+        "Welcome 😎\n\nPlease select your gender:",
+        reply_markup=InlineKeyboardMarkup(keyboard),
     )
 
-async def handle_find(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ---------------- CALLBACKS ---------------- #
 
-    user_id = update.effective_user.id
+async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    user_id = query.from_user.id
 
-    if user_id not in user_gender:
-        await update.message.reply_text("⚠ Please select gender first.")
+    await query.answer()
+
+    if is_banned(user_id):
+        await query.message.reply_text("🚫 You are banned.")
         return
 
-    partner = find_partner(user_id)
+    # -------- GENDER -------- #
+
+    if query.data.startswith("gender_"):
+        gender = query.data.split("_")[1]
+        user_gender[user_id] = gender
+
+        await query.message.reply_text(
+            f"✅ Gender set to {gender.capitalize()}",
+            reply_markup=get_main_menu(),
+        )
+        return
+
+    # -------- FIND PARTNER -------- #
+
+    if query.data == "find":
+        if user_id in active_chats:
+            await query.message.reply_text("⚠ You are already in chat.")
+            return
+
+        if user_id not in waiting_users:
+            waiting_users.append(user_id)
+
+        await query.message.reply_text("🔎 Searching for partner...")
+
+        if len(waiting_users) >= 2:
+            user1 = waiting_users.pop(0)
+            user2 = waiting_users.pop(0)
+
+            active_chats[user1] = user2
+            active_chats[user2] = user1
+
+            await context.bot.send_message(
+                user1,
+                "🤝 Partner Found!",
+                reply_markup=get_chat_controls(),
+            )
+
+            await context.bot.send_message(
+                user2,
+                "🤝 Partner Found!",
+                reply_markup=get_chat_controls(),
+            )
+        return
+
+    # -------- NEXT -------- #
+
+    if query.data == "next":
+        partner = active_chats.get(user_id)
+
+        if not partner:
+            await query.message.reply_text("⚠ No active chat.")
+            return
+
+        del active_chats[user_id]
+        del active_chats[partner]
+
+        waiting_users.append(user_id)
+
+        await context.bot.send_message(partner, "❌ Partner left.")
+
+        await query.message.reply_text("🔎 Finding new partner...")
+
+        if len(waiting_users) >= 2:
+            user1 = waiting_users.pop(0)
+            user2 = waiting_users.pop(0)
+
+            active_chats[user1] = user2
+            active_chats[user2] = user1
+
+            await context.bot.send_message(
+                user1,
+                "🤝 Partner Found!",
+                reply_markup=get_chat_controls(),
+            )
+
+            await context.bot.send_message(
+                user2,
+                "🤝 Partner Found!",
+                reply_markup=get_chat_controls(),
+            )
+        return
+
+    # -------- END -------- #
+
+    if query.data == "end":
+        partner = active_chats.get(user_id)
+
+        if not partner:
+            await query.message.reply_text("⚠ No active chat.")
+            return
+
+        del active_chats[user_id]
+        del active_chats[partner]
+
+        await context.bot.send_message(partner, "❌ Chat ended.")
+
+        await query.message.reply_text(
+            "❌ Chat ended.",
+            reply_markup=get_main_menu(),
+        )
+        return
+
+    # -------- PROFILE -------- #
+
+    if query.data == "profile":
+        gender = user_gender.get(user_id, "Not Set")
+        reports = user_reports.get(user_id, 0)
+
+        await query.message.reply_text(
+            f"👤 Your Profile\n\nGender: {gender}\nReports: {reports}",
+            reply_markup=get_main_menu(),
+        )
+        return
+
+    # -------- SETTINGS -------- #
+
+    if query.data == "settings":
+        keyboard = [
+            [InlineKeyboardButton("🚩 Report", callback_data="report")],
+            [InlineKeyboardButton("⬅ Back", callback_data="back")],
+        ]
+
+        await query.message.reply_text(
+            "⚙ Settings",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return
+
+    if query.data == "back":
+        await query.message.reply_text("⬅ Back", reply_markup=get_main_menu())
+        return
+
+    # -------- REPORT -------- #
+
+    if query.data == "report":
+        partner = active_chats.get(user_id)
+
+        if not partner:
+            await query.message.reply_text("⚠ No active chat.")
+            return
+
+        user_reports[partner] = user_reports.get(partner, 0) + 1
+
+        await query.message.reply_text("🚩 User Reported.")
+
+        if is_banned(partner):
+            await context.bot.send_message(partner, "🚫 You are banned.")
+        return
+
+# ---------------- MESSAGE RELAY ---------------- #
+
+async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+
+    if is_banned(user_id):
+        return
+
+    partner = active_chats.get(user_id)
 
     if partner:
+        await context.bot.send_message(partner, update.message.text)
 
-        await update.message.reply_text(
-            "🤝 Partner Found!",
-            reply_markup=chat_keyboard()
-        )
-
-        await context.bot.send_message(
-            partner,
-            "🤝 Partner Found!",
-            reply_markup=chat_keyboard()
-        )
-
-    else:
-        await update.message.reply_text("🔎 Searching for partner...")
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-    text = update.message.text
-
-    if user_id not in active_chats:
-        return
-
-    partner_id = active_chats[user_id]
-
-    if partner_id == user_id:
-        return
-
-    await context.bot.send_message(partner_id, text)
-
-async def handle_next(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-
-    partner_id = end_chat(user_id)
-
-    if partner_id:
-        await context.bot.send_message(partner_id, "❌ Your partner left the chat.")
-        waiting_users.append(partner_id)
-
-    partner = find_partner(user_id)
-
-    if partner:
-
-        await update.message.reply_text(
-            "🤝 New Partner Found!",
-            reply_markup=chat_keyboard()
-        )
-
-        await context.bot.send_message(
-            partner,
-            "🤝 New Partner Found!",
-            reply_markup=chat_keyboard()
-        )
-
-    else:
-        await update.message.reply_text("🔎 Searching for new partner...")
-
-async def handle_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-
-    partner_id = end_chat(user_id)
-
-    if partner_id:
-        await context.bot.send_message(partner_id, "❌ Chat ended.")
-
-    await update.message.reply_text(
-        "✅ Chat ended.",
-        reply_markup=main_keyboard()
-    )
-
-async def handle_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-
-    gender = user_gender.get(user_id, "Not Set")
-
-    await update.message.reply_text(
-        f"👤 Your Profile\n\nGender: {gender}"
-    )
-
-# ---------------- MAIN ----------------
+# ---------------- MAIN ---------------- #
 
 def main():
-
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-
-    app.add_handler(MessageHandler(filters.Regex("Male|Female"), handle_gender))
-    app.add_handler(MessageHandler(filters.Regex("Find Partner"), handle_find))
-    app.add_handler(MessageHandler(filters.Regex("Next"), handle_next))
-    app.add_handler(MessageHandler(filters.Regex("End"), handle_end))
-    app.add_handler(MessageHandler(filters.Regex("Profile"), handle_profile))
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(CallbackQueryHandler(handle_buttons))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
 
     print("Bot Running 🚀")
 
