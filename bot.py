@@ -221,6 +221,8 @@ async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(partner_id, update.message.text)
 
+# ---------------- MAIN ---------------- #
+
 def main():
     print("Bot Running 🚀")
 
@@ -236,10 +238,12 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("⏭ Next"), next_chat))
     app.add_handler(MessageHandler(filters.Regex("❌ End"), end_chat))
 
-    app.add_handler(MessageHandler(filters.Regex("⬅ Back"), back_to_menu))
-
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
 
-    app.run_polling(drop_pending_updates=True)main()
+    app.run_polling(drop_pending_updates=True)
+
+
+if __name__ == "__main__":
+    main()
 
 
