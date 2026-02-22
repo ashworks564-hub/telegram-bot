@@ -124,8 +124,19 @@ async def match_users(context):
     active_chats[user1] = user2
     active_chats[user2] = user1
 
-    await context.bot.send_message(user1, "🤝 Partner Found!", reply_markup=chat_keyboard)
-    await context.bot.send_message(user2, "🤝 Partner Found!", reply_markup=chat_keyboard)
+   keyboard_chat = ReplyKeyboardMarkup(
+    [["⏭ Next", "❌ End"]],
+    resize_keyboard=True
+)
+
+msg = (
+    "🤝 Partner Found!\n\n"
+    "🚫 Links are blocked\n"
+    "📵 No media allowed"
+)
+
+await context.bot.send_message(user1, msg, reply_markup=keyboard_chat)
+await context.bot.send_message(user2, msg, reply_markup=keyboard_chat)
 
 # ---------------- PROFILE ---------------- #
 
@@ -245,5 +256,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
