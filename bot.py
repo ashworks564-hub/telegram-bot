@@ -165,8 +165,9 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- SETTINGS ---------------- #
 
-async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await show_main_menu(update)
+async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    keyboard = ReplyKeyboardMarkup(
         [
             ["🚩 Report"],
             ["👦 Match with Male", "👧 Match with Female"],
@@ -276,6 +277,7 @@ def main():
     )
 
     app.run_polling(drop_pending_updates=True)
+
 
 
 
