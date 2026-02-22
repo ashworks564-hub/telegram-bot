@@ -115,6 +115,7 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- MATCHING ---------------- #
 
 async def match_users(context):
+
     if len(waiting_users) < 2:
         return
 
@@ -124,20 +125,25 @@ async def match_users(context):
     active_chats[user1] = user2
     active_chats[user2] = user1
 
-   keyboard_chat = ReplyKeyboardMarkup(
-    [["⏭ Next", "❌ End"]],
-    resize_keyboard=True
-)
+    keyboard_chat = ReplyKeyboardMarkup(
+        [["⏭ Next", "❌ End"]],
+        resize_keyboard=True
+    )
 
-msg = (
-    "🤝 Partner Found!\n\n"
-    "🚫 Links are blocked\n"
-    "📵 No media allowed"
-)
+    msg = (
+        "🤝 Partner Found!\n\n"
+        "🚫 Links are blocked\n"
+        "📵 No media allowed"
+    )
 
-await context.bot.send_message(user1, msg, reply_markup=keyboard_chat)
-await context.bot.send_message(user2, msg, reply_markup=keyboard_chat)
+    try:
+        await context.bot.send_message(user1, msg, reply_markup=keyboard_chat)
+        await context.bot.send_message(user2, msg, reply_markup=keyboard_chat)
 
+    except:
+        # If one user fails → clean chat
+        active_chats.pop(user1, None)
+        active_chats.pop(user2, None)
 # ---------------- PROFILE ---------------- #
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -256,6 +262,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
