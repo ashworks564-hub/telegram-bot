@@ -98,17 +98,36 @@ async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- FIND PARTNER ---------------- #
 
+import asyncio
+
 async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
     if user_id in active_chats:
-        await update.message.reply_text("Already in chat.")
+        await update.message.reply_text("⚠ Already in chat.")
         return
 
     if user_id not in waiting_users:
         waiting_users.append(user_id)
 
-    await update.message.reply_text("🔎 Searching for partner...")
+    # Send initial searching message
+    search_msg = await update.message.reply_text("🔎 Searching for partner")
+
+    # Smooth animation (NO spam)
+    dots = ["", ".", "..", "..."]
+
+    for i in range(6):
+        await asyncio.sleep(0.5)
+        await search_msg.edit_text(f"🔎 Searching for partner{dots[i % 4]}")
+
+        # 🔥 अगर बीच में match मिल जाए तो animation रोक दो
+        if user_id in active_chats:
+            return
+
+    # Final waiting message
+    await search_msg.edit_text(
+        "🔎 Searching for partner...\n\n⏳ Waiting for another user..."
+    )
 
     await match_users(context)
 
@@ -277,6 +296,7 @@ def main():
     )
 
     app.run_polling(drop_pending_updates=True)
+
 
 
 
