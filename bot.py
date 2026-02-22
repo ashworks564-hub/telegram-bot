@@ -165,8 +165,8 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- SETTINGS ---------------- #
 
-async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = ReplyKeyboardMarkup(
+async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await show_main_menu(update)
         [
             ["🚩 Report"],
             ["👦 Match with Male", "👧 Match with Female"],
@@ -264,13 +264,18 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("⏭ Next"), next_chat))
     app.add_handler(MessageHandler(filters.Regex("❌ End"), end_chat))
 
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
+    
+    app.add_handler(MessageHandler(filters.Regex("^⬅ Back$"), back_to_menu))
+
+    
+    app.add_handler(
+        MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            relay
+        )
+    )
 
     app.run_polling(drop_pending_updates=True)
-
-
-if __name__ == "__main__":
-    main()
 
 
 
