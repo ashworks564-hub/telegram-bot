@@ -228,8 +228,10 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
 
+    # Commands
     app.add_handler(CommandHandler("start", start))
 
+    # Buttons / Menu Actions
     app.add_handler(MessageHandler(filters.Regex("👦 Male|👧 Female"), set_gender))
     app.add_handler(MessageHandler(filters.Regex("🔎 Find Partner"), find_partner))
     app.add_handler(MessageHandler(filters.Regex("👤 Profile"), profile))
@@ -238,9 +240,15 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("⏭ Next"), next_chat))
     app.add_handler(MessageHandler(filters.Regex("❌ End"), end_chat))
 
+    # ✅ Back Button (IMPORTANT — before relay)
+    app.add_handler(MessageHandler(filters.Regex("⬅ Back"), back_to_menu))
+
+    # Normal Messages
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
 
     app.run_polling()
 
+
 if __name__ == "__main__":
     main()
+
