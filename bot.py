@@ -166,9 +166,18 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- SETTINGS ---------------- #
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = ReplyKeyboardMarkup(
+        [
+            ["🚩 Report"],
+            ["👦 Match with Male", "👧 Match with Female"],
+            ["⬅ Back"]
+        ],
+        resize_keyboard=True
+    )
+
     await update.message.reply_text(
-        "⚙ Settings",
-        reply_markup=settings_keyboard
+        "⚙ Settings\n\nSelect an option:",
+        reply_markup=keyboard
     )
 
 # ---------------- REPORT ---------------- #
@@ -262,6 +271,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
