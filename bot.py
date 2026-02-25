@@ -256,51 +256,25 @@ async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     print("Bot Running 🚀")
 
-    from flask import Flask
-    import threading
-    import os
-
-    app_flask = Flask(__name__)
-
-    @app_flask.route('/')
-    def home():
-        return "Bot Alive"
-
-    def run_flask():
-        port = int(os.environ.get("PORT", 10000))
-        app_flask.run(host="0.0.0.0", port=port)
-
-    threading.Thread(target=run_flask).start()
-
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
 
-    # ✅ EMOJI-PROOF HANDLERS
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Male|Female"), set_gender))
-
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Find Partner"), find_partner))
-
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Profile"), profile))
-
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Settings"), settings))
-
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Report"), report))
-
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Next"), next_chat))
-
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("End"), end_chat))
-
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Back"), back_to_menu))
+    app.add_handler(MessageHandler(filters.Regex("👦 Male|👧 Female"), set_gender))
+    app.add_handler(MessageHandler(filters.Regex("🔎 Find Partner"), find_partner))
+    app.add_handler(MessageHandler(filters.Regex("👤 Profile"), profile))
+    app.add_handler(MessageHandler(filters.Regex("⚙ Settings"), settings))
+    app.add_handler(MessageHandler(filters.Regex("🚩 Report"), report))
+    app.add_handler(MessageHandler(filters.Regex("⏭ Next"), next_chat))
+    app.add_handler(MessageHandler(filters.Regex("❌ End"), end_chat))
+    app.add_handler(MessageHandler(filters.Regex("⬅ Back"), back_to_menu))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
 
-    app.run_polling(drop_pending_updates=True)
-
+    app.run_polling()
 
 if __name__ == "__main__":
     main()
-
 
 
 
