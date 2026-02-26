@@ -111,7 +111,7 @@ async def match_users(context):
     msg = (
         "🤝 Partner Found!\n\n"
         "🚫 Links are blocked\n"
-        "📵 No media allowed"
+        "🎭 Stay anonymous & have fun"
     )
 
     await context.bot.send_message(user1, msg, reply_markup=chat_keyboard)
@@ -238,3 +238,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
