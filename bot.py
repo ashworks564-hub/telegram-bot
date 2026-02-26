@@ -110,7 +110,7 @@ async def match_users(context):
 
     msg = (
         "🤝 Partner Found!\n\n"
-        "🚫 Links are blocked\n"
+        "💬 Say hi and start chatting\n"
         "🎭 Stay anonymous & have fun"
     )
 
@@ -238,4 +238,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
