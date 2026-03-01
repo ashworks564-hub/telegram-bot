@@ -296,9 +296,9 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("👦 Male|👧 Female"), set_gender))
 
     # -------- MAIN MENU -------- #
-    app.add_handler(MessageHandler(filters.Regex("🔎 Find Partner"), find_partner))
-    app.add_handler(MessageHandler(filters.Regex("👤 Profile"), profile))
-    app.add_handler(MessageHandler(filters.Regex("⚙ Settings"), settings))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Find Partner"), find_partner))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Profile"), profile))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Settings"), settings))
 
     # -------- SETTINGS -------- #
     app.add_handler(MessageHandler(filters.Regex("🚩 Report"), report))
@@ -309,7 +309,13 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("❌ End"), end_chat))
 
     # -------- MESSAGE RELAY -------- #
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
+    app.add_handler(
+    MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        relay
+    ),
+    group=1
+)
 
     # -------- START BOT -------- #
     app.run_polling(drop_pending_updates=True)
@@ -317,6 +323,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
