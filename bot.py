@@ -102,6 +102,7 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- MATCHING ---------------- #
 
 async def match_users(context):
+
     if len(waiting_users) < 2:
         return
 
@@ -111,21 +112,44 @@ async def match_users(context):
     active_chats[user1] = user2
     active_chats[user2] = user1
 
-    msg = (
-        "🤝 Partner Found!\n\n"
-        "💬 Say hi and start chatting\n"
-        "🎭 Stay anonymous & have fun"
-    )
-
-    keyboard = InlineKeyboardMarkup([
+    inline_keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("⏭ Next", callback_data="next"),
             InlineKeyboardButton("❌ End", callback_data="end")
         ]
     ])
-    
-    await context.bot.send_message(user1, msg, reply_markup=chat_keyboard)
-    await context.bot.send_message(user2, msg, reply_markup=chat_keyboard)
+
+    msg = (
+        "🤝 Partner Found!\n\n"
+        "✅ You joined a chat\n"
+        "🚫 Links are blocked\n"
+        "📵 No media allowed"
+    )
+
+    # Send with BOTH keyboards
+    await context.bot.send_message(
+        user1,
+        msg,
+        reply_markup=inline_keyboard
+    )
+
+    await context.bot.send_message(
+        user1,
+        "Chat Controls 👇",
+        reply_markup=chat_keyboard
+    )
+
+    await context.bot.send_message(
+        user2,
+        msg,
+        reply_markup=inline_keyboard
+    )
+
+    await context.bot.send_message(
+        user2,
+        "Chat Controls 👇",
+        reply_markup=chat_keyboard
+    )
 
 # ---------------- PROFILE ---------------- #
 
@@ -291,6 +315,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
