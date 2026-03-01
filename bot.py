@@ -114,6 +114,13 @@ async def match_users(context):
         "🎭 Stay anonymous & have fun"
     )
 
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("⏭ Next", callback_data="next"),
+            InlineKeyboardButton("❌ End", callback_data="end")
+        ]
+    ])
+    
     await context.bot.send_message(user1, msg, reply_markup=chat_keyboard)
     await context.bot.send_message(user2, msg, reply_markup=chat_keyboard)
 
@@ -228,16 +235,21 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("👤 Profile"), profile))
     app.add_handler(MessageHandler(filters.Regex("⚙ Settings"), settings))
     app.add_handler(MessageHandler(filters.Regex("🚩 Report"), report))
-    app.add_handler(MessageHandler(filters.Regex("⏭ Next"), next_chat))
-    app.add_handler(MessageHandler(filters.Regex("❌ End"), end_chat))
     app.add_handler(MessageHandler(filters.Regex("⬅ Back"), back_to_menu))
 
+     # -------- INLINE BUTTON HANDLER (Next / End) -------- #
+    app.add_handler(CallbackQueryHandler(button_handler))
+
+    # -------- Message Relay -------- #
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
 
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True)
+    
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
 
 if __name__ == "__main__":
     main()
+
 
 
 
