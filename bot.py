@@ -297,8 +297,8 @@ def main():
 
     # -------- MAIN MENU -------- #
     app.add_handler(MessageHandler(filters.Regex("🔎 Find Partner"), find_partner))
-    app.add_handler(MessageHandler(filters.Regex("👤 Profile"), profile))
-    app.add_handler(MessageHandler(filters.Regex("⚙ Settings"), settings))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Profile"), profile))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Settings"), settings))
 
     # -------- SETTINGS -------- #
     app.add_handler(MessageHandler(filters.Regex("🚩 Report"), report))
@@ -317,6 +317,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
