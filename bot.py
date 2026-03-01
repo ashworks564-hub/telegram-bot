@@ -269,60 +269,57 @@ async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     partner_id = active_chats[user_id]
 
     await context.bot.send_message(partner_id, update.message.text)
+    
+# ---------------- TEXT ROUTER ---------------- #
 
-# ---------------- MAIN ---------------- #
+async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
 
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
+    if "Find Partner" in text:
+        await find_partner(update, context)
 
-    if query.data == "next":
+    elif "Profile" in text:
+        await profile(update, context)
+
+    elif "Settings" in text:
+        await settings(update, context)
+
+    elif "Report" in text:
+        await report(update, context)
+
+    elif "Back" in text:
+        await back_to_menu(update, context)
+
+    elif "Next" in text:
         await next_chat(update, context)
-    elif query.data == "end":
+
+    elif "End" in text:
         await end_chat(update, context)
 
+    else:
+        await relay(update, context)
+
+# ---------------- MAIN ---------------- #
 
 def main():
     print("Bot Running 🚀")
 
     app = Application.builder().token(TOKEN).build()
 
+    # Inline buttons
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    # -------- COMMAND -------- #
+    # Start
     app.add_handler(CommandHandler("start", start))
 
-    # -------- ONBOARDING -------- #
+    # Gender
     app.add_handler(MessageHandler(filters.Regex("👦 Male|👧 Female"), set_gender))
 
-    # -------- MAIN MENU -------- #
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Find Partner"), find_partner))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Profile"), profile))
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("Settings"), settings))
+    # All text goes to router
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 
-    # -------- SETTINGS -------- #
-    app.add_handler(MessageHandler(filters.Regex("🚩 Report"), report))
-    app.add_handler(MessageHandler(filters.Regex("⬅ Back"), back_to_menu))
-
-    # -------- CHAT CONTROLS -------- #
-    app.add_handler(MessageHandler(filters.Regex("⏭ Next"), next_chat))
-    app.add_handler(MessageHandler(filters.Regex("❌ End"), end_chat))
-
-    # -------- MESSAGE RELAY -------- #
-    app.add_handler(
-    MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        relay
-    ),
-    group=1
-)
-
-    # -------- START BOT -------- #
     app.run_polling(drop_pending_updates=True)
 
-
-if __name__ == "__main__":
-    main()
 
 
 
