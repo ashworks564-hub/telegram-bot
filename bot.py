@@ -1,9 +1,8 @@
 import os
 import threading
 from flask import Flask
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
-
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 TOKEN = os.getenv("TOKEN")
 
 # ---------------- FLASK SERVER ---------------- #
@@ -119,6 +118,7 @@ async def match_users(context):
     active_chats[user1] = user2
     active_chats[user2] = user1
 
+    # Buttons under message
     inline_keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("⏭ Next", callback_data="next"),
@@ -133,30 +133,13 @@ async def match_users(context):
         "📵 No media allowed"
     )
 
-    # Send with BOTH keyboards
-    await context.bot.send_message(
-        user1,
-        msg,
-        reply_markup=inline_keyboard
-    )
+    # Send message with inline buttons
+    await context.bot.send_message(user1, msg, reply_markup=inline_keyboard)
+    await context.bot.send_message(user2, msg, reply_markup=inline_keyboard)
 
-    await context.bot.send_message(
-        user1,
-        "Chat Controls 👇",
-        reply_markup=chat_keyboard
-    )
-
-    await context.bot.send_message(
-        user2,
-        msg,
-        reply_markup=inline_keyboard
-    )
-
-    await context.bot.send_message(
-        user2,
-        "Chat Controls 👇",
-        reply_markup=chat_keyboard
-    )
+    # Show bottom keyboard also
+    await context.bot.send_message(user1, "Chat Controls 👇", reply_markup=chat_keyboard)
+    await context.bot.send_message(user2, "Chat Controls 👇", reply_markup=chat_keyboard)
 
 # ---------------- PROFILE ---------------- #
 
@@ -289,10 +272,22 @@ async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- MAIN ---------------- #
 
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "next":
+        await next_chat(update, context)
+    elif query.data == "end":
+        await end_chat(update, context)
+
+
 def main():
     print("Bot Running 🚀")
 
     app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CallbackQueryHandler(button_handler))
 
     # -------- COMMAND -------- #
     app.add_handler(CommandHandler("start", start))
@@ -322,6 +317,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
