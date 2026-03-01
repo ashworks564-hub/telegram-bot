@@ -88,14 +88,21 @@ async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
+    # 🔥 FORCE CLEAN if stuck
     if user_id in active_chats:
-        await update.message.reply_text("⚠ Already in chat.")
-        return
+        partner_id = active_chats.get(user_id)
 
-    if user_id not in waiting_users:
-        waiting_users.append(user_id)
+        active_chats.pop(user_id, None)
+        if partner_id:
+            active_chats.pop(partner_id, None)
 
-    await update.message.reply_text("⏳ Finding better match...")
+    # Remove from waiting list if stuck
+    if user_id in waiting_users:
+        waiting_users.remove(user_id)
+
+    waiting_users.append(user_id)
+
+    await update.message.reply_text("🔎 Searching for partner...")
 
     await match_users(context)
 
@@ -315,6 +322,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
