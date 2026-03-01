@@ -228,27 +228,35 @@ def main():
 
     app = Application.builder().token(TOKEN).build()
 
+    # -------- COMMAND -------- #
     app.add_handler(CommandHandler("start", start))
 
+    # -------- ONBOARDING -------- #
     app.add_handler(MessageHandler(filters.Regex("👦 Male|👧 Female"), set_gender))
+
+    # -------- MAIN MENU -------- #
     app.add_handler(MessageHandler(filters.Regex("🔎 Find Partner"), find_partner))
     app.add_handler(MessageHandler(filters.Regex("👤 Profile"), profile))
     app.add_handler(MessageHandler(filters.Regex("⚙ Settings"), settings))
+
+    # -------- SETTINGS -------- #
     app.add_handler(MessageHandler(filters.Regex("🚩 Report"), report))
     app.add_handler(MessageHandler(filters.Regex("⬅ Back"), back_to_menu))
 
-     # -------- INLINE BUTTON HANDLER (Next / End) -------- #
-    app.add_handler(CallbackQueryHandler(button_handler))
+    # -------- CHAT CONTROLS -------- #
+    app.add_handler(MessageHandler(filters.Regex("⏭ Next"), next_chat))
+    app.add_handler(MessageHandler(filters.Regex("❌ End"), end_chat))
 
-    # -------- Message Relay -------- #
+    # -------- MESSAGE RELAY -------- #
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
 
+    # -------- START BOT -------- #
     app.run_polling(drop_pending_updates=True)
-    
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, relay))
+
 
 if __name__ == "__main__":
     main()
+
 
 
 
