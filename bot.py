@@ -331,9 +331,12 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 
     app.run_polling(drop_pending_updates=True)
-    
-    if __name__ == "__main__":
+
+
+# 👇 THIS MUST BE OUTSIDE main()
+if __name__ == "__main__":
     main()
+
 
 
 
