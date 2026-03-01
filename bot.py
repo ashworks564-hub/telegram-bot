@@ -270,6 +270,18 @@ async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(partner_id, update.message.text)
     
+# ---------------- INLINE BUTTON HANDLER ---------------- #
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "next":
+        await next_chat(update, context)
+
+    elif query.data == "end":
+        await end_chat(update, context)
+    
 # ---------------- TEXT ROUTER ---------------- #
 
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -319,6 +331,10 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 
     app.run_polling(drop_pending_updates=True)
+    
+    if __name__ == "__main__":
+    main()
+
 
 
 
