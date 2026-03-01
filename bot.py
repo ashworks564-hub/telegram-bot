@@ -92,7 +92,7 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_id not in waiting_users:
         waiting_users.append(user_id)
 
-    await update.message.reply_text("🔎 Searching for partner...")
+    await update.message.reply_text("⏳ Finding better match...")
 
     await match_users(context)
 
@@ -238,5 +238,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
