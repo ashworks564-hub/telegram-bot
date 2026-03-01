@@ -147,11 +147,43 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ---------------- SETTINGS ---------------- #
 
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "⚙ Settings\n\nSelect an option:",
-        reply_markup=settings_keyboard
+    user_id = update.effective_user.id
+    user = users.get(user_id)
+
+    if not user:
+        return
+
+    text = (
+        "👤 User\n"
+        "Free Member\n\n"
+        f"🆔 ID: {user_id}\n\n"
+        "⚙ Your Preferences:\n"
+        f"🚻 Gender: {user.get('gender', 'Not Set')}\n"
+        f"🎯 Looking for: {user.get('match_pref', 'Everyone')}\n"
+        f"🎂 Age: {user.get('age', 'Not Set')}\n"
+        f"🌍 Country: {user.get('country', 'India')}\n"
+        f"🗣 Language: {user.get('language', 'English')}"
     )
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🚻 Change Gender", callback_data="change_gender"),
+            InlineKeyboardButton("🎯 Partner Pref", callback_data="partner_pref")
+        ],
+        [
+            InlineKeyboardButton("🎂 Set Age", callback_data="set_age"),
+            InlineKeyboardButton("🌍 Set Country", callback_data="set_country")
+        ],
+        [
+            InlineKeyboardButton("🗣 Language", callback_data="set_language"),
+            InlineKeyboardButton("❌ Close", callback_data="close_settings")
+        ]
+    ])
+
+    await update.message.reply_text(text, reply_markup=keyboard)
 
 # ---------------- BACK ---------------- #
 
@@ -259,6 +291,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
