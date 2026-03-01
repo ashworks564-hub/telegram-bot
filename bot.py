@@ -59,10 +59,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "premium": False
     }
 
-    await update.message.reply_text(
-        "Welcome 😎\n\nPlease select your gender:",
-        reply_markup=gender_keyboard
-    )
+await update.message.reply_text(
+    "⚡ Welcome to Chatx99\n\n"
+    "Thousands of conversations happen here every day.\n"
+    "Your next one could be interesting 😌\n\n"
+    "👇 Pick your gender and jump in:",
+    reply_markup=gender_keyboard
+)
 
 # ---------------- GENDER ---------------- #
 
@@ -256,6 +259,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
