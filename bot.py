@@ -33,7 +33,9 @@ gender_keyboard = ReplyKeyboardMarkup(
 )
 
 main_menu_keyboard = ReplyKeyboardMarkup(
-    [["🔎 Find Partner"], ["👤 Profile", "⚙ Settings"]],
+    [["🔎 Find Partner"],
+     ["👤 Profile", "⚙ Settings"],
+     ["💎 Premium"]],
     resize_keyboard=True
 )
 
@@ -281,6 +283,34 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif query.data == "end":
         await end_chat(update, context)
+        
+# ---------------- PREMIUM ---------------- #
+
+async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    msg = (
+        "💎 *Premium Membership*\n\n"
+
+        "📌 *Advantages of Premium:*\n\n"
+
+        "🚫 No advertisements\n"
+        "🔎 Search partner by gender\n"
+        "⭐ Support the chat\n\n"
+
+        "💰 *Plans:*\n\n"
+
+        "⭐ 100 stars / $1.99 week\n"
+        "⭐ 250 stars / $3.99 month\n"
+        "⭐ 1000 stars / $19.99 year\n\n"
+
+        "Tap below to become VIP 👇"
+    )
+
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💎 Become VIP", callback_data="buy_vip")]
+    ])
+
+    await update.message.reply_text(msg, reply_markup=keyboard, parse_mode="Markdown")
     
 # ---------------- TEXT ROUTER ---------------- #
 
@@ -295,6 +325,9 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif "Settings" in text:
         await settings(update, context)
+    
+    elif "Premium" in text:
+        await premium(update, context)
 
     elif "Report" in text:
         await report(update, context)
@@ -336,6 +369,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
