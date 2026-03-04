@@ -1,9 +1,29 @@
 import os
 import threading
+import psycopg2
 from flask import Flask
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
+
+
+# ---------------- DATABASE ---------------- #
+
 TOKEN = os.getenv("TOKEN")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+conn = psycopg2.connect(DATABASE_URL)
+cursor = conn.cursor()
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS users (
+    user_id BIGINT PRIMARY KEY,
+    gender TEXT,
+    reports INTEGER DEFAULT 0,
+    premium BOOLEAN DEFAULT FALSE
+)
+""")
+
+conn.commit()
 
 # ---------------- FLASK SERVER ---------------- #
 
@@ -52,13 +72,19 @@ settings_keyboard = ReplyKeyboardMarkup(
 # ---------------- START ---------------- #
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
 
-    users[user_id] = {
-        "gender": None,
-        "reports": 0,
-        "premium": False
-    }
+    cursor.execute(
+        """
+        INSERT INTO users (user_id)
+        VALUES (%s)
+        ON CONFLICT (user_id) DO NOTHING
+        """,
+        (user_id,)
+    )
+
+    conn.commit()
 
     await update.message.reply_text(
         "⚡ Welcome to Chatx99\n\n"
@@ -471,6 +497,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
