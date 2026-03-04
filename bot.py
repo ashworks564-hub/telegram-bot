@@ -401,7 +401,7 @@ async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("💎 Become VIP", callback_data="vip_info")]
     ])
 
-    await query.message.edit_text(text, reply_markup=keyboard)
+    await update.message.reply_text(text, reply_markup=keyboard)
     
 # ---------------- TEXT ROUTER ---------------- #
 
@@ -460,6 +460,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
