@@ -24,6 +24,19 @@ CREATE TABLE IF NOT EXISTS users (
 )
 """)
 
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS waiting_users (
+    user_id BIGINT PRIMARY KEY
+)
+""")
+
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS active_chats (
+    user1 BIGINT,
+    user2 BIGINT
+)
+""")
+
 conn.commit()
 
 # ---------------- FLASK SERVER ---------------- #
@@ -561,6 +574,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
