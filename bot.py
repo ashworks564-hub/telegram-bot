@@ -224,12 +224,17 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
-    cursor.execute(
-        "SELECT gender, reports, premium FROM users WHERE user_id=%s",
-        (user_id,)
-    )
+    conn = db()
+cursor = conn.cursor()
 
-    data = cursor.fetchone()
+cursor.execute(
+    "SELECT gender, reports, premium FROM users WHERE user_id=%s",
+    (user_id,)
+)
+
+data = cursor.fetchone()
+
+conn.close()
 
     if not data:
         return
@@ -632,6 +637,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
