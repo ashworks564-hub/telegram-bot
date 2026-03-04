@@ -153,27 +153,39 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     cursor.execute(
-        "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
-        (user_id,)
-    )
-    conn.commit()
+    "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
+    (user_id,)
+)
+conn.commit()
 
-    if user_id not in waiting_users:
-        waiting_users.append(user_id)
+await update.message.reply_text("🔎 Searching for partner...")
 
-    await update.message.reply_text("🔎 Searching for partner...")
-
-    await match_users(context)
+await match_users(context)
 
 # ---------------- MATCHING ---------------- #
 
 async def match_users(context):
 
-    if len(waiting_users) < 2:
+    cursor.execute("SELECT user_id FROM waiting_users LIMIT 2")
+    users_found = cursor.fetchall()
+
+    if len(users_found) < 2:
         return
 
-    user1 = waiting_users.pop(0)
-    user2 = waiting_users.pop(0)
+    user1 = users_found[0][0]
+    user2 = users_found[1][0]
+
+    cursor.execute(
+        "DELETE FROM waiting_users WHERE user_id IN (%s,%s)",
+        (user1, user2)
+    )
+
+    cursor.execute(
+        "INSERT INTO active_chats (user1,user2) VALUES (%s,%s)",
+        (user1, user2)
+    )
+
+    conn.commit()
 
     active_chats[user1] = user2
     active_chats[user2] = user1
@@ -363,10 +375,18 @@ async def end_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    if user_id not in active_chats:
-        return
+    cursor.execute(
+    "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
+    (user_id, user_id)
+)
 
-    partner_id = active_chats[user_id]
+data = cursor.fetchone()
+
+if not data:
+    return
+
+user1, user2 = data
+partner_id = user2 if user1 == user_id else user1
 
     await context.bot.send_message(partner_id, update.message.text)
     
@@ -569,6 +589,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
