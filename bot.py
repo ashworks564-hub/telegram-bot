@@ -5,42 +5,49 @@ from flask import Flask
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters, CallbackQueryHandler
 
+TOKEN = os.getenv("TOKEN")
+DATABASE_URL = os.getenv("DATABASE_URL")
+
 
 # ---------------- DATABASE ---------------- #
 
 def db():
     return psycopg2.connect(DATABASE_URL)
 
-TOKEN = os.getenv("TOKEN")
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-conn = psycopg2.connect(DATABASE_URL)
-cursor = conn.cursor()
+def init_db():
+    conn = db()
+    cursor = conn.cursor()
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users (
-    user_id BIGINT PRIMARY KEY,
-    gender TEXT,
-    reports INTEGER DEFAULT 0,
-    premium BOOLEAN DEFAULT FALSE,
-    banned BOOLEAN DEFAULT FALSE
-)
-""")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        user_id BIGINT PRIMARY KEY,
+        gender TEXT,
+        reports INTEGER DEFAULT 0,
+        premium BOOLEAN DEFAULT FALSE,
+        banned BOOLEAN DEFAULT FALSE
+    )
+    """)
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS waiting_users (
-    user_id BIGINT PRIMARY KEY
-)
-""")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS waiting_users (
+        user_id BIGINT PRIMARY KEY
+    )
+    """)
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS active_chats (
-    user1 BIGINT,
-    user2 BIGINT
-)
-""")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS active_chats (
+        user1 BIGINT,
+        user2 BIGINT
+    )
+    """)
 
-conn.commit()
+    conn.commit()
+    conn.close()
+
+
+init_db()
+
 
 # ---------------- FLASK SERVER ---------------- #
 
@@ -50,17 +57,14 @@ app_flask = Flask(__name__)
 def home():
     return "Bot Alive"
 
+
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app_flask.run(host="0.0.0.0", port=port)
 
+
 threading.Thread(target=run_flask).start()
 
-# ---------------- BOT DATA ---------------- #
-
-users = {}
-waiting_users = []
-active_chats = {}
 
 # ---------------- KEYBOARDS ---------------- #
 
@@ -76,15 +80,6 @@ main_menu_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
-chat_keyboard = ReplyKeyboardMarkup(
-    [["⏭ Next", "❌ End"]],
-    resize_keyboard=True
-)
-
-settings_keyboard = ReplyKeyboardMarkup(
-    [["🚩 Report"], ["⬅ Back"]],
-    resize_keyboard=True
-)
 
 # ---------------- START ---------------- #
 
@@ -92,24 +87,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
+    conn = db()
+    cursor = conn.cursor()
+
     cursor.execute(
-        """
-        INSERT INTO users (user_id)
-        VALUES (%s)
-        ON CONFLICT (user_id) DO NOTHING
-        """,
+        "INSERT INTO users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
         (user_id,)
     )
 
     conn.commit()
+    conn.close()
 
     await update.message.reply_text(
-        "⚡ Welcome to Chatx99\n\n"
-        "Thousands of conversations happen here every day.\n"
-        "Your next one could be interesting 😌\n\n"
-        "👇 Pick your gender and jump in:",
+        "⚡ Welcome to Chatx99\n\nChoose your gender:",
         reply_markup=gender_keyboard
     )
+
 
 # ---------------- GENDER ---------------- #
 
@@ -118,10 +111,10 @@ async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
 
-    if text not in ["👦 Male", "👧 Female"]:
-        return
-
     gender = "Male" if "Male" in text else "Female"
+
+    conn = db()
+    cursor = conn.cursor()
 
     cursor.execute(
         "UPDATE users SET gender=%s WHERE user_id=%s",
@@ -129,11 +122,13 @@ async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
     conn.commit()
+    conn.close()
 
     await update.message.reply_text(
         f"✅ Gender set to {gender}",
         reply_markup=main_menu_keyboard
     )
+
 
 # ---------------- FIND PARTNER ---------------- #
 
@@ -141,21 +136,9 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
 
-    # check if user is banned
-    cursor.execute(
-        "SELECT banned FROM users WHERE user_id=%s",
-        (user_id,)
-    )
+    conn = db()
+    cursor = conn.cursor()
 
-    banned = cursor.fetchone()[0]
-
-    if banned:
-        await update.message.reply_text(
-            "🚫 You are banned from using this chat."
-        )
-        return
-
-    # add user to waiting list
     cursor.execute(
         "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
         (user_id,)
@@ -165,20 +148,15 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("🔎 Searching for partner...")
 
-    await match_users(context)
-
-# ---------------- MATCHING ---------------- #
-
-async def match_users(context):
-
     cursor.execute("SELECT user_id FROM waiting_users LIMIT 2")
-    users_found = cursor.fetchall()
+    users = cursor.fetchall()
 
-    if len(users_found) < 2:
+    if len(users) < 2:
+        conn.close()
         return
 
-    user1 = users_found[0][0]
-    user2 = users_found[1][0]
+    user1 = users[0][0]
+    user2 = users[1][0]
 
     cursor.execute(
         "DELETE FROM waiting_users WHERE user_id IN (%s,%s)",
@@ -191,32 +169,20 @@ async def match_users(context):
     )
 
     conn.commit()
+    conn.close()
 
-    active_chats[user1] = user2
-    active_chats[user2] = user1
-
-    # Buttons under message
-    inline_keyboard = InlineKeyboardMarkup([
+    keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton("⏭ Next", callback_data="next"),
             InlineKeyboardButton("❌ End", callback_data="end")
         ]
     ])
 
-    msg = (
-        "🤝 Partner Found!\n\n"
-        "✅ You joined a chat\n"
-        "🚫 Links are blocked\n"
-        "📵 No media allowed"
-    )
+    msg = "🤝 Partner Found!"
 
-    # Send message with inline buttons
-    await context.bot.send_message(user1, msg, reply_markup=inline_keyboard)
-    await context.bot.send_message(user2, msg, reply_markup=inline_keyboard)
+    await context.bot.send_message(user1, msg, reply_markup=keyboard)
+    await context.bot.send_message(user2, msg, reply_markup=keyboard)
 
-    # Show bottom keyboard also
-    await context.bot.send_message(user1, "Chat Controls 👇", reply_markup=chat_keyboard)
-    await context.bot.send_message(user2, "Chat Controls 👇", reply_markup=chat_keyboard)
 
 # ---------------- PROFILE ---------------- #
 
@@ -228,16 +194,14 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT gender, reports, premium FROM users WHERE user_id=%s",
+        "SELECT gender,reports,premium FROM users WHERE user_id=%s",
         (user_id,)
     )
 
     data = cursor.fetchone()
-
     conn.close()
 
     if not data:
-        await update.message.reply_text("Profile not found.")
         return
 
     gender, reports, premium = data
@@ -245,341 +209,32 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     premium_status = "Yes ✅" if premium else "No ❌"
 
     await update.message.reply_text(
-        f"👤 Your Profile\n\n"
-        f"Gender: {gender}\n"
-        f"Reports: {reports}\n"
-        f"Premium: {premium_status}"
+        f"👤 Profile\n\nGender: {gender}\nReports: {reports}\nPremium: {premium_status}"
     )
 
-# ---------------- SETTINGS ---------------- #
 
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+# ---------------- SETTINGS ---------------- #
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = update.effective_user.id
+
+    conn = db()
+    cursor = conn.cursor()
 
     cursor.execute(
         "SELECT gender FROM users WHERE user_id=%s",
         (user_id,)
     )
 
-    data = cursor.fetchone()
+    gender = cursor.fetchone()[0]
+    conn.close()
 
-    if not data:
-        return
-
-    gender = data[0]
-
-    text = (
-        "👤 User\n"
-        "Free Member\n\n"
-        f"🆔 ID: {user_id}\n\n"
-        "⚙ Your Preferences:\n"
-        f"🚻 Gender: {gender}\n"
-        f"🎯 Looking for: Everyone\n"
-        f"🎂 Age: Not Set\n"
-        f"🌍 Country: India\n"
-        f"🗣 Language: English"
-    )
-
-    keyboard = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("🚻 Change Gender", callback_data="change_gender"),
-            InlineKeyboardButton("🎯 Partner Pref", callback_data="partner_pref")
-        ],
-        [
-            InlineKeyboardButton("🎂 Set Age", callback_data="set_age"),
-            InlineKeyboardButton("🌍 Set Country", callback_data="set_country")
-        ],
-        [
-            InlineKeyboardButton("🗣 Language", callback_data="set_language"),
-            InlineKeyboardButton("❌ Close", callback_data="close_settings")
-        ]
-    ])
-
-    await update.message.reply_text(text, reply_markup=keyboard)
-
-# ---------------- BACK ---------------- #
-
-async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🏠 Main Menu",
-        reply_markup=main_menu_keyboard
+        f"⚙ Settings\n\nGender: {gender}"
     )
 
-# ---------------- REPORT ---------------- #
 
-async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-
-    if user_id not in active_chats:
-        await update.message.reply_text("No active partner.")
-        return
-
-    partner_id = active_chats[user_id]
-
-    cursor.execute(
-        "UPDATE users SET reports = reports + 1 WHERE user_id=%s",
-        (partner_id,)
-    )
-
-    conn.commit()
-
-    # check reports
-    cursor.execute(
-        "SELECT reports FROM users WHERE user_id=%s",
-        (partner_id,)
-    )
-
-    reports = cursor.fetchone()[0]
-
-    if reports >= 5:
-        cursor.execute(
-            "UPDATE users SET banned=TRUE WHERE user_id=%s",
-            (partner_id,)
-        )
-        conn.commit()
-
-    await update.message.reply_text("🚩 User reported.")
-    
-# ---------------- NEXT ---------------- #
-
-async def next_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-
-    cursor.execute(
-        "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
-        (user_id, user_id)
-    )
-
-    data = cursor.fetchone()
-
-    if not data:
-        return
-
-    user1, user2 = data
-    partner_id = user2 if user1 == user_id else user1
-
-    # remove active chat
-    cursor.execute(
-        "DELETE FROM active_chats WHERE user1=%s OR user2=%s",
-        (user_id, user_id)
-    )
-
-    # add both users back to waiting queue
-    cursor.execute(
-        "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
-        (user_id,)
-    )
-
-    cursor.execute(
-        "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
-        (partner_id,)
-    )
-
-    conn.commit()
-
-    await context.bot.send_message(user_id, "⏭ Finding new partner...")
-    await context.bot.send_message(partner_id, "⏭ Finding new partner...")
-
-    await match_users(context)
-
-# ---------------- END ---------------- #
-
-async def end_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-
-    cursor.execute(
-        "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
-        (user_id, user_id)
-    )
-
-    data = cursor.fetchone()
-
-    if not data:
-        return
-
-    user1, user2 = data
-    partner_id = user2 if user1 == user_id else user1
-
-    cursor.execute(
-        "DELETE FROM active_chats WHERE user1=%s OR user2=%s",
-        (user_id, user_id)
-    )
-
-    conn.commit()
-
-    await context.bot.send_message(user_id, "❌ Chat ended.", reply_markup=main_menu_keyboard)
-    await context.bot.send_message(partner_id, "❌ Partner disconnected.", reply_markup=main_menu_keyboard)
-
-# ---------------- RELAY ---------------- #
-
-async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    user_id = update.effective_user.id
-
-    cursor.execute(
-        "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
-        (user_id, user_id)
-    )
-
-    data = cursor.fetchone()
-
-    if not data:
-        return
-
-    user1, user2 = data
-
-    partner_id = user2 if user1 == user_id else user1
-
-    await context.bot.send_message(partner_id, update.message.text)
-    
-# ---------------- INLINE BUTTON HANDLER ---------------- #
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    query = update.callback_query
-    await query.answer()
-
-    # Chat buttons
-    if query.data == "next":
-        await next_chat(update, context)
-
-    elif query.data == "end":
-        await end_chat(update, context)
-
-    # -------- 100 STARS --------
-    elif query.data == "vip_week":
-
-        text = (
-            "⭐ 100 Telegram Stars / $1.99 for a week premium\n\n"
-            "You can buy Premium using Telegram Stars.\n"
-            "To buy Telegram Stars you'll use the payment methods "
-            "from Google Play or the App Store.\n\n"
-            "Get premium now:"
-        )
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⭐ 100 Telegram Stars", callback_data="buy_week")],
-            [InlineKeyboardButton("← Back", callback_data="back_premium")]
-        ])
-
-        await query.message.edit_text(text, reply_markup=keyboard)
-
-    # -------- 250 STARS --------
-    elif query.data == "vip_month":
-
-        text = (
-            "⭐ 250 Telegram Stars / $3.99 for a month premium\n\n"
-            "You can buy Premium using Telegram Stars.\n"
-            "To buy Telegram Stars you'll use the payment methods "
-            "from Google Play or the App Store.\n\n"
-            "Get premium now:"
-        )
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⭐ 250 Telegram Stars", callback_data="buy_month")],
-            [InlineKeyboardButton("← Back", callback_data="back_premium")]
-        ])
-
-        await query.message.edit_text(text, reply_markup=keyboard)
-
-    # -------- 1000 STARS --------
-    elif query.data == "vip_year":
-
-        text = (
-            "⭐ 1000 Telegram Stars / $19.99 for a year premium\n\n"
-            "You can buy Premium using Telegram Stars.\n"
-            "To buy Telegram Stars you'll use the payment methods "
-            "from Google Play or the App Store.\n\n"
-            "Get premium now:"
-        )
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⭐ 1000 Telegram Stars", callback_data="buy_year")],
-            [InlineKeyboardButton("← Back", callback_data="back_premium")]
-        ])
-
-        await query.message.edit_text(text, reply_markup=keyboard)
-
-    # -------- VIP --------
-    elif query.data == "vip_info":
-
-        text = (
-            "💎 4000 Telegram Stars / $79.99 for 12 months VIP\n\n"
-            "VIP users get:\n"
-            "• Priority partner search\n"
-            "• VIP badge\n"
-            "• Faster matching\n\n"
-            "Get VIP now:"
-        )
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("💎 4000 Telegram Stars", callback_data="buy_vip")],
-            [InlineKeyboardButton("← Back", callback_data="back_premium")]
-        ])
-
-        await query.message.edit_text(text, reply_markup=keyboard)
-
-    # -------- BACK --------
-    elif query.data == "back_premium":
-
-        text = (
-            "The advantages of being a premium user:\n\n"
-            "📌 No advertisements\n"
-            "🔎 We don't show advertisements to premium users\n\n"
-            "📌 Search by gender\n"
-            "🔎 Premium users can search partners by gender\n\n"
-            "📌 Support the chat\n"
-            "🔎 This is the most valuable part of premium subscription.\n"
-            "The more you support us, the less advertisements we send\n\n"
-            "💎 If you want to become not just a premium, but a unique VIP user,"
-            " go to the details with the command /vip"
-        )
-
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("100 ⭐ / $1.99 a week", callback_data="vip_week")],
-            [InlineKeyboardButton("250 ⭐ / $3.99 a month", callback_data="vip_month")],
-            [InlineKeyboardButton("1000 ⭐ / $19.99 a year", callback_data="vip_year")],
-            [InlineKeyboardButton("💎 Become VIP", callback_data="vip_info")]
-        ])
-
-        await query.message.edit_text(text, reply_markup=keyboard)
-        
-# ---------------- PREMIUM ---------------- #
-
-async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    text = (
-        "The advantages of being a premium user:\n\n"
-
-        "📌 No advertisements\n"
-        "🔎 We don't show advertisements to premium users\n\n"
-
-        "📌 Search by gender\n"
-        "🔎 Premium users can search partners by gender\n\n"
-
-        "📌 Support the chat\n"
-        "🔎 This is the most valuable part of premium subscription.\n"
-        "The more you support us, the less advertisements we send\n\n"
-
-        "💎 If you want to become not just a premium, but a unique VIP user,"
-        " go to the details with the command /vip"
-    )
-
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("100 ⭐ / $1.99 a week", callback_data="vip_week")],
-        [InlineKeyboardButton("250 ⭐ / $3.99 a month", callback_data="vip_month")],
-        [InlineKeyboardButton("1000 ⭐ / $19.99 a year", callback_data="vip_year")],
-        [InlineKeyboardButton("💎 Become VIP", callback_data="vip_info")]
-    ])
-
-    await update.message.reply_text(text, reply_markup=keyboard)
-    
 # ---------------- TEXT ROUTER ---------------- #
 
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -588,103 +243,31 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "🔎 Find Partner":
         await find_partner(update, context)
+        return
 
-    elif text == "👤 Profile":
+    if text == "👤 Profile":
         await profile(update, context)
+        return
 
-    elif text == "⚙ Settings":
+    if text == "⚙ Settings":
         await settings(update, context)
+        return
 
-    elif text == "💎 Premium":
-        await premium(update, context)
-
-    elif text == "🚩 Report":
-        await report(update, context)
-
-    elif text == "⬅ Back":
-        await back_to_menu(update, context)
-
-    elif text == "⏭ Next":
-        await next_chat(update, context)
-
-    elif text == "❌ End":
-        await end_chat(update, context)
-
-    else:
-        await relay(update, context)
 
 # ---------------- MAIN ---------------- #
 
 def main():
-    print("Bot Running 🚀")
 
     app = Application.builder().token(TOKEN).build()
 
-    # Inline buttons
-    app.add_handler(CallbackQueryHandler(button_handler))
-
-    # Start
     app.add_handler(CommandHandler("start", start))
 
-    # Gender
     app.add_handler(MessageHandler(filters.Regex("^(👦 Male|👧 Female)$"), set_gender))
 
-    # All text goes to router
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling()
 
 
-# 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
