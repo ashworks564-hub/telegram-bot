@@ -286,15 +286,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query.data == "end":
         await end_chat(update, context)
 
-    # ---------------- 100 STARS ---------------- #
-
+    # -------- 100 STARS --------
     elif query.data == "vip_week":
 
         text = (
             "⭐ 100 Telegram Stars / $1.99 for a week premium\n\n"
-            "You can buy Premium in @Chatx99_bot using Telegram Stars.\n"
-            "To buy Telegram Stars, you'll use the payment methods from "
-            "Google Play or the App Store.\n\n"
+            "You can buy Premium using Telegram Stars.\n"
+            "To buy Telegram Stars you'll use the payment methods "
+            "from Google Play or the App Store.\n\n"
             "Get premium now:"
         )
 
@@ -305,15 +304,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.edit_text(text, reply_markup=keyboard)
 
-    # ---------------- 250 STARS ---------------- #
-
+    # -------- 250 STARS --------
     elif query.data == "vip_month":
 
         text = (
             "⭐ 250 Telegram Stars / $3.99 for a month premium\n\n"
-            "You can buy Premium in @Chatx99_bot using Telegram Stars.\n"
-            "To buy Telegram Stars, you'll use the payment methods from "
-            "Google Play or the App Store.\n\n"
+            "You can buy Premium using Telegram Stars.\n"
+            "To buy Telegram Stars you'll use the payment methods "
+            "from Google Play or the App Store.\n\n"
             "Get premium now:"
         )
 
@@ -324,15 +322,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.edit_text(text, reply_markup=keyboard)
 
-    # ---------------- 1000 STARS ---------------- #
-
+    # -------- 1000 STARS --------
     elif query.data == "vip_year":
 
         text = (
             "⭐ 1000 Telegram Stars / $19.99 for a year premium\n\n"
-            "You can buy Premium in @Chatx99_bot using Telegram Stars.\n"
-            "To buy Telegram Stars, you'll use the payment methods from "
-            "Google Play or the App Store.\n\n"
+            "You can buy Premium using Telegram Stars.\n"
+            "To buy Telegram Stars you'll use the payment methods "
+            "from Google Play or the App Store.\n\n"
             "Get premium now:"
         )
 
@@ -341,21 +338,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("← Back", callback_data="back_premium")]
         ])
 
-        await query.message.edit_text(text, reply_markup=keyboard)    
-        
-    # ---------------- VIP (4000 STARS) ---------------- #
+        await query.message.edit_text(text, reply_markup=keyboard)
 
+    # -------- VIP --------
     elif query.data == "vip_info":
 
         text = (
             "💎 4000 Telegram Stars / $79.99 for 12 months VIP\n\n"
-            "You can buy Premium in @Chatx99_bot using Telegram Stars.\n"
-            "To buy Telegram Stars, you'll use the payment methods from "
-            "Google Play or the App Store.\n\n"
             "VIP users get:\n"
-            "• 12 months premium account\n"
             "• Priority partner search\n"
-            "• VIP badge visible to other users\n\n"
+            "• VIP badge\n"
+            "• Faster matching\n\n"
             "Get VIP now:"
         )
 
@@ -366,36 +359,30 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.edit_text(text, reply_markup=keyboard)
 
-    # Back button
+    # -------- BACK --------
     elif query.data == "back_premium":
-    await query.message.edit_text(
-        "The advantages of being a premium user:",
-        reply_markup=premium_keyboard
-    )
-        
-elif query.data == "back_premium":
 
-    text = (
-        "The advantages of being a premium user:\n\n"
-        "📌 No advertisements\n"
-        "🔎 We don't show advertisements to premium users\n\n"
-        "📌 Search by gender\n"
-        "🔎 Premium users can search partners by gender\n\n"
-        "📌 Support the chat\n"
-        "🔎 This is the most valuable part of premium subscription.\n"
-        "The more you support us, the less advertisements we send\n\n"
-        "💎 If you want to become not just a premium, but a unique VIP user,"
-        " go to the details with the command /vip"
-    )
+        text = (
+            "The advantages of being a premium user:\n\n"
+            "📌 No advertisements\n"
+            "🔎 We don't show advertisements to premium users\n\n"
+            "📌 Search by gender\n"
+            "🔎 Premium users can search partners by gender\n\n"
+            "📌 Support the chat\n"
+            "🔎 This is the most valuable part of premium subscription.\n"
+            "The more you support us, the less advertisements we send\n\n"
+            "💎 If you want to become not just a premium, but a unique VIP user,"
+            " go to the details with the command /vip"
+        )
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("100 ⭐ / $1.99 a week", callback_data="vip_week")],
-        [InlineKeyboardButton("250 ⭐ / $3.99 a month", callback_data="vip_month")],
-        [InlineKeyboardButton("1000 ⭐ / $19.99 a year", callback_data="vip_year")],
-        [InlineKeyboardButton("💎 Become VIP", callback_data="vip_info")]
-    ])
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("100 ⭐ / $1.99 a week", callback_data="vip_week")],
+            [InlineKeyboardButton("250 ⭐ / $3.99 a month", callback_data="vip_month")],
+            [InlineKeyboardButton("1000 ⭐ / $19.99 a year", callback_data="vip_year")],
+            [InlineKeyboardButton("💎 Become VIP", callback_data="vip_info")]
+        ])
 
-    await query.message.edit_text(text, reply_markup=keyboard)
+        await query.message.edit_text(text, reply_markup=keyboard)
     
 # ---------------- TEXT ROUTER ---------------- #
 
@@ -454,6 +441,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
