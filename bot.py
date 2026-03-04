@@ -539,34 +539,43 @@ async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- TEXT ROUTER ---------------- #
 
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     text = update.message.text
 
     if text == "🔎 Find Partner":
         await find_partner(update, context)
+        return
 
-    elif text == "👤 Profile":
+    if text == "👤 Profile":
         await profile(update, context)
+        return
 
-    elif text == "⚙ Settings":
+    if text == "⚙ Settings":
         await settings(update, context)
+        return
 
-    elif text == "💎 Premium":
+    if text == "💎 Premium":
         await premium(update, context)
+        return
 
-    elif text == "🚩 Report":
+    if text == "🚩 Report":
         await report(update, context)
+        return
 
-    elif text == "⬅ Back":
+    if text == "⬅ Back":
         await back_to_menu(update, context)
+        return
 
-    elif text == "⏭ Next":
+    if text == "⏭ Next":
         await next_chat(update, context)
+        return
 
-    elif text == "❌ End":
+    if text == "❌ End":
         await end_chat(update, context)
+        return
 
-    else:
-        await relay(update, context)
+    # only send messages if user is in active chat
+    await relay(update, context)
 
 # ---------------- MAIN ---------------- #
 
@@ -593,6 +602,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
