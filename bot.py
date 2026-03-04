@@ -341,6 +341,29 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("← Back", callback_data="back_premium")]
         ])
 
+        await query.message.reply_text(text, reply_markup=keyboard)    
+        
+    # ---------------- VIP (4000 STARS) ---------------- #
+
+    elif query.data == "vip_info":
+
+        text = (
+            "💎 4000 Telegram Stars / $79.99 for 12 months VIP\n\n"
+            "You can buy Premium in @chatbot using Telegram Stars.\n"
+            "To buy Telegram Stars, you'll use the payment methods from "
+            "Google Play or the App Store.\n\n"
+            "VIP users get:\n"
+            "• 12 months premium account\n"
+            "• Priority partner search\n"
+            "• VIP badge visible to other users\n\n"
+            "Get VIP now:"
+        )
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💎 4000 Telegram Stars", callback_data="buy_vip")],
+            [InlineKeyboardButton("← Back", callback_data="back_premium")]
+        ])
+
         await query.message.reply_text(text, reply_markup=keyboard)
 
     # Back button
@@ -434,6 +457,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
