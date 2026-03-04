@@ -8,6 +8,9 @@ from telegram.ext import Application, CommandHandler, MessageHandler, ContextTyp
 
 # ---------------- DATABASE ---------------- #
 
+def db():
+    return psycopg2.connect(DATABASE_URL)
+
 TOKEN = os.getenv("TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -338,18 +341,40 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- NEXT ---------------- #
 
 async def next_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
 
-    if user_id not in active_chats:
+    cursor.execute(
+        "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
+        (user_id, user_id)
+    )
+
+    data = cursor.fetchone()
+
+    if not data:
         return
 
-    partner_id = active_chats[user_id]
+    user1, user2 = data
+    partner_id = user2 if user1 == user_id else user1
 
-    del active_chats[user_id]
-    del active_chats[partner_id]
+    # remove active chat
+    cursor.execute(
+        "DELETE FROM active_chats WHERE user1=%s OR user2=%s",
+        (user_id, user_id)
+    )
 
-    waiting_users.append(user_id)
-    waiting_users.append(partner_id)
+    # add both users back to waiting queue
+    cursor.execute(
+        "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
+        (user_id,)
+    )
+
+    cursor.execute(
+        "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
+        (partner_id,)
+    )
+
+    conn.commit()
 
     await context.bot.send_message(user_id, "⏭ Finding new partner...")
     await context.bot.send_message(partner_id, "⏭ Finding new partner...")
@@ -359,15 +384,28 @@ async def next_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- END ---------------- #
 
 async def end_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
 
-    if user_id not in active_chats:
+    cursor.execute(
+        "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
+        (user_id, user_id)
+    )
+
+    data = cursor.fetchone()
+
+    if not data:
         return
 
-    partner_id = active_chats[user_id]
+    user1, user2 = data
+    partner_id = user2 if user1 == user_id else user1
 
-    del active_chats[user_id]
-    del active_chats[partner_id]
+    cursor.execute(
+        "DELETE FROM active_chats WHERE user1=%s OR user2=%s",
+        (user_id, user_id)
+    )
+
+    conn.commit()
 
     await context.bot.send_message(user_id, "❌ Chat ended.", reply_markup=main_menu_keyboard)
     await context.bot.send_message(partner_id, "❌ Partner disconnected.", reply_markup=main_menu_keyboard)
@@ -602,6 +640,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
