@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS users (
     user_id BIGINT PRIMARY KEY,
     gender TEXT,
     reports INTEGER DEFAULT 0,
-    premium BOOLEAN DEFAULT FALSE
+    premium BOOLEAN DEFAULT FALSE,
+    banned BOOLEAN DEFAULT FALSE
 )
 """)
 
@@ -271,6 +272,21 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     conn.commit()
 
+    # check reports
+    cursor.execute(
+        "SELECT reports FROM users WHERE user_id=%s",
+        (partner_id,)
+    )
+
+    reports = cursor.fetchone()[0]
+
+    if reports >= 5:
+        cursor.execute(
+            "UPDATE users SET banned=TRUE WHERE user_id=%s",
+            (partner_id,)
+        )
+        conn.commit()
+
     await update.message.reply_text("🚩 User reported.")
     
 # ---------------- NEXT ---------------- #
@@ -521,6 +537,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
