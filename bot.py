@@ -582,38 +582,30 @@ async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if text == "🔎 Find Partner":
         await find_partner(update, context)
-        return
 
-    if text == "👤 Profile":
+    elif text == "👤 Profile":
         await profile(update, context)
-        return
 
-    if text == "⚙ Settings":
+    elif text == "⚙ Settings":
         await settings(update, context)
-        return
 
-    if text == "💎 Premium":
+    elif text == "💎 Premium":
         await premium(update, context)
-        return
 
-    if text == "🚩 Report":
+    elif text == "🚩 Report":
         await report(update, context)
-        return
 
-    if text == "⬅ Back":
+    elif text == "⬅ Back":
         await back_to_menu(update, context)
-        return
 
-    if text == "⏭ Next":
+    elif text == "⏭ Next":
         await next_chat(update, context)
-        return
 
-    if text == "❌ End":
+    elif text == "❌ End":
         await end_chat(update, context)
-        return
 
-    # only send messages if user is in active chat
-    await relay(update, context)
+    else:
+        await relay(update, context)
 
 # ---------------- MAIN ---------------- #
 
@@ -629,7 +621,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
 
     # Gender
-    app.add_handler(MessageHandler(filters.Regex("👦 Male|👧 Female"), set_gender))
+    app.add_handler(MessageHandler(filters.Regex("^(👦 Male|👧 Female)$"), set_gender))
 
     # All text goes to router
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
@@ -640,6 +632,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
