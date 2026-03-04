@@ -288,29 +288,24 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    msg = (
-        "💎 *Premium Membership*\n\n"
+    text = (
+        "The advantages of being a premium user:\n\n"
 
-        "📌 *Advantages of Premium:*\n\n"
+        "📌 No advertisements\n"
+        "🔎 We don't show advertisements to premium users\n\n"
 
-        "🚫 No advertisements\n"
-        "🔎 Search partner by gender\n"
-        "⭐ Support the chat\n\n"
+        "📌 Search by gender\n"
+        "🔎 Premium users can search partners by gender\n\n"
 
-        "💰 *Plans:*\n\n"
+        "📌 Support the chat\n"
+        "🔎 This is the most valuable part of premium subscription.\n"
+        "The more you support us, the less advertisements we send\n\n"
 
-        "⭐ 100 stars / $1.99 week\n"
-        "⭐ 250 stars / $3.99 month\n"
-        "⭐ 1000 stars / $19.99 year\n\n"
-
-        "Tap below to become VIP 👇"
+        "💎 If you want to become not just a premium, but a unique VIP user, "
+        "go to the details with the command /vip"
     )
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("💎 Become VIP", callback_data="buy_vip")]
-    ])
-
-    await update.message.reply_text(msg, reply_markup=keyboard, parse_mode="Markdown")
+    await update.message.reply_text(text)
     
 # ---------------- TEXT ROUTER ---------------- #
 
@@ -369,6 +364,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
