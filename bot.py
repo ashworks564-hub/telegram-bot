@@ -373,20 +373,22 @@ async def end_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- RELAY ---------------- #
 
 async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
 
     cursor.execute(
-    "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
-    (user_id, user_id)
-)
+        "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
+        (user_id, user_id)
+    )
 
-data = cursor.fetchone()
+    data = cursor.fetchone()
 
-if not data:
-    return
+    if not data:
+        return
 
-user1, user2 = data
-partner_id = user2 if user1 == user_id else user1
+    user1, user2 = data
+
+    partner_id = user2 if user1 == user_id else user1
 
     await context.bot.send_message(partner_id, update.message.text)
     
@@ -589,6 +591,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
