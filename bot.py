@@ -373,25 +373,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=premium_keyboard
     )
         
-# ---------------- PREMIUM ---------------- #
-
-async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
+elif query.data == "back_premium":
 
     text = (
         "The advantages of being a premium user:\n\n"
-
         "📌 No advertisements\n"
         "🔎 We don't show advertisements to premium users\n\n"
-
         "📌 Search by gender\n"
         "🔎 Premium users can search partners by gender\n\n"
-
         "📌 Support the chat\n"
         "🔎 This is the most valuable part of premium subscription.\n"
         "The more you support us, the less advertisements we send\n\n"
-
-        "💎 If you want to become not just a premium, but a unique VIP user, "
-        "go to the details with the command /vip"
+        "💎 If you want to become not just a premium, but a unique VIP user,"
+        " go to the details with the command /vip"
     )
 
     keyboard = InlineKeyboardMarkup([
@@ -401,7 +395,7 @@ async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("💎 Become VIP", callback_data="vip_info")]
     ])
 
-    await update.message.reply_text(text, reply_markup=keyboard)
+    await query.message.edit_text(text, reply_markup=keyboard)
     
 # ---------------- TEXT ROUTER ---------------- #
 
@@ -460,6 +454,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
