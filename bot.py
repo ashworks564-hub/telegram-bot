@@ -275,14 +275,38 @@ async def relay(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- INLINE BUTTON HANDLER ---------------- #
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     query = update.callback_query
     await query.answer()
 
+    # Chat controls
     if query.data == "next":
         await next_chat(update, context)
 
     elif query.data == "end":
         await end_chat(update, context)
+
+    # Premium week button
+    elif query.data == "vip_week":
+
+        text = (
+            "⭐ 100 Telegram Stars / $1.99 for a week premium\n\n"
+            "You can buy Premium using Telegram Stars.\n"
+            "To buy Telegram Stars, you'll use the payment methods "
+            "from Google Play or the App Store.\n\n"
+            "Get premium now:"
+        )
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⭐ 100 Telegram Stars", callback_data="buy_week")],
+            [InlineKeyboardButton("← Back", callback_data="back_premium")]
+        ])
+
+        await query.message.reply_text(text, reply_markup=keyboard)
+
+    # Back to premium page
+    elif query.data == "back_premium":
+        await premium(update, context)
         
 # ---------------- PREMIUM ---------------- #
 
@@ -371,6 +395,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
