@@ -305,7 +305,14 @@ async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "go to the details with the command /vip"
     )
 
-    await update.message.reply_text(text)
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("100 ⭐ / $1.99 a week", callback_data="vip_week")],
+        [InlineKeyboardButton("250 ⭐ / $3.99 a month", callback_data="vip_month")],
+        [InlineKeyboardButton("1000 ⭐ / $19.99 a year", callback_data="vip_year")],
+        [InlineKeyboardButton("💎 Become VIP", callback_data="vip_info")]
+    ])
+
+    await update.message.reply_text(text, reply_markup=keyboard)
     
 # ---------------- TEXT ROUTER ---------------- #
 
@@ -364,6 +371,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
