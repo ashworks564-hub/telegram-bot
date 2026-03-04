@@ -389,28 +389,28 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
 
-    if "Find Partner" in text:
+    if text == "🔎 Find Partner":
         await find_partner(update, context)
 
-    elif "Profile" in text:
+    elif text == "👤 Profile":
         await profile(update, context)
 
-    elif "Settings" in text:
+    elif text == "⚙ Settings":
         await settings(update, context)
-    
-    elif "Premium" in text:
+
+    elif text == "💎 Premium":
         await premium(update, context)
 
-    elif "Report" in text:
+    elif text == "🚩 Report":
         await report(update, context)
 
-    elif "Back" in text:
+    elif text == "⬅ Back":
         await back_to_menu(update, context)
 
-    elif "Next" in text:
+    elif text == "⏭ Next":
         await next_chat(update, context)
 
-    elif "End" in text:
+    elif text == "❌ End":
         await end_chat(update, context)
 
     else:
@@ -441,6 +441,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
