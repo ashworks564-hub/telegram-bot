@@ -152,19 +152,13 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    # 🔥 FORCE CLEAN if stuck
-    if user_id in active_chats:
-        partner_id = active_chats.get(user_id)
+    # save user in database waiting list
+    cursor.execute(
+        "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
+        (user_id,)
+    )
 
-        active_chats.pop(user_id, None)
-        if partner_id:
-            active_chats.pop(partner_id, None)
-
-    # Remove from waiting list if stuck
-    if user_id in waiting_users:
-        waiting_users.remove(user_id)
-
-    waiting_users.append(user_id)
+    conn.commit()
 
     await update.message.reply_text("🔎 Searching for partner...")
 
@@ -574,6 +568,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
