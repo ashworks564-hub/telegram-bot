@@ -152,15 +152,17 @@ async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    # add user to waiting list
     cursor.execute(
-    "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
-    (user_id,)
-)
-conn.commit()
+        "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
+        (user_id,)
+    )
 
-await update.message.reply_text("🔎 Searching for partner...")
+    conn.commit()
 
-await match_users(context)
+    await update.message.reply_text("🔎 Searching for partner...")
+
+    await match_users(context)
 
 # ---------------- MATCHING ---------------- #
 
@@ -591,6 +593,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
