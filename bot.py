@@ -303,7 +303,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("← Back", callback_data="back_premium")]
         ])
 
-        await query.message.reply_text(text, reply_markup=keyboard)
+        await query.message.edit_text(text, reply_markup=keyboard)
 
     # ---------------- 250 STARS ---------------- #
 
@@ -322,7 +322,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("← Back", callback_data="back_premium")]
         ])
 
-        await query.message.reply_text(text, reply_markup=keyboard)
+        await query.message.edit_text(text, reply_markup=keyboard)
 
     # ---------------- 1000 STARS ---------------- #
 
@@ -341,7 +341,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("← Back", callback_data="back_premium")]
         ])
 
-        await query.message.reply_text(text, reply_markup=keyboard)    
+        await query.message.edit_text(text, reply_markup=keyboard)    
         
     # ---------------- VIP (4000 STARS) ---------------- #
 
@@ -364,7 +364,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("← Back", callback_data="back_premium")]
         ])
 
-        await query.message.reply_text(text, reply_markup=keyboard)
+        await query.message.edit_text(text, reply_markup=keyboard)
 
     # Back button
     elif query.data == "back_premium":
@@ -398,7 +398,7 @@ async def premium(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("💎 Become VIP", callback_data="vip_info")]
     ])
 
-    await update.message.reply_text(text, reply_markup=keyboard)
+    await query.message.edit_text(text, reply_markup=keyboard)
     
 # ---------------- TEXT ROUTER ---------------- #
 
@@ -457,6 +457,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
