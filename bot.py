@@ -292,7 +292,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         text = (
             "⭐ 100 Telegram Stars / $1.99 for a week premium\n\n"
-            "You can buy Premium in @chatbot using Telegram Stars.\n"
+            "You can buy Premium in @Chatx99_bot using Telegram Stars.\n"
             "To buy Telegram Stars, you'll use the payment methods from "
             "Google Play or the App Store.\n\n"
             "Get premium now:"
@@ -311,7 +311,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         text = (
             "⭐ 250 Telegram Stars / $3.99 for a month premium\n\n"
-            "You can buy Premium in @chatbot using Telegram Stars.\n"
+            "You can buy Premium in @Chatx99_bot using Telegram Stars.\n"
             "To buy Telegram Stars, you'll use the payment methods from "
             "Google Play or the App Store.\n\n"
             "Get premium now:"
@@ -330,7 +330,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         text = (
             "⭐ 1000 Telegram Stars / $19.99 for a year premium\n\n"
-            "You can buy Premium in @chatbot using Telegram Stars.\n"
+            "You can buy Premium in @Chatx99_bot using Telegram Stars.\n"
             "To buy Telegram Stars, you'll use the payment methods from "
             "Google Play or the App Store.\n\n"
             "Get premium now:"
@@ -349,7 +349,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         text = (
             "💎 4000 Telegram Stars / $79.99 for 12 months VIP\n\n"
-            "You can buy Premium in @chatbot using Telegram Stars.\n"
+            "You can buy Premium in @Chatx99_bot using Telegram Stars.\n"
             "To buy Telegram Stars, you'll use the payment methods from "
             "Google Play or the App Store.\n\n"
             "VIP users get:\n"
@@ -460,6 +460,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
