@@ -180,18 +180,27 @@ async def match_users(context):
 # ---------------- PROFILE ---------------- #
 
 async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
-    data = users.get(user_id)
+
+    cursor.execute(
+        "SELECT gender, reports, premium FROM users WHERE user_id=%s",
+        (user_id,)
+    )
+
+    data = cursor.fetchone()
 
     if not data:
         return
 
-    premium_status = "Yes ✅" if data["premium"] else "No ❌"
+    gender, reports, premium = data
+
+    premium_status = "Yes ✅" if premium else "No ❌"
 
     await update.message.reply_text(
         f"👤 Your Profile\n\n"
-        f"Gender: {data['gender']}\n"
-        f"Reports: {data['reports']}\n"
+        f"Gender: {gender}\n"
+        f"Reports: {reports}\n"
         f"Premium: {premium_status}"
     )
 
@@ -505,6 +514,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
