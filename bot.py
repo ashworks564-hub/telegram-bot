@@ -97,16 +97,24 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- GENDER ---------------- #
 
 async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
     text = update.message.text
 
     if text not in ["👦 Male", "👧 Female"]:
         return
 
-    users[user_id]["gender"] = "Male" if "Male" in text else "Female"
+    gender = "Male" if "Male" in text else "Female"
+
+    cursor.execute(
+        "UPDATE users SET gender=%s WHERE user_id=%s",
+        (gender, user_id)
+    )
+
+    conn.commit()
 
     await update.message.reply_text(
-        f"✅ Gender set to {users[user_id]['gender']}",
+        f"✅ Gender set to {gender}",
         reply_markup=main_menu_keyboard
     )
 
@@ -497,6 +505,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
