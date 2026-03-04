@@ -368,7 +368,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # Back button
     elif query.data == "back_premium":
-        await premium(update, context)
+    await query.message.edit_text(
+        "The advantages of being a premium user:",
+        reply_markup=premium_keyboard
+    )
         
 # ---------------- PREMIUM ---------------- #
 
@@ -457,6 +460,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
