@@ -225,22 +225,31 @@ async def profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user = users.get(user_id)
 
-    if not user:
+    user_id = update.effective_user.id
+
+    cursor.execute(
+        "SELECT gender FROM users WHERE user_id=%s",
+        (user_id,)
+    )
+
+    data = cursor.fetchone()
+
+    if not data:
         return
+
+    gender = data[0]
 
     text = (
         "👤 User\n"
         "Free Member\n\n"
         f"🆔 ID: {user_id}\n\n"
         "⚙ Your Preferences:\n"
-        f"🚻 Gender: {user.get('gender', 'Not Set')}\n"
-        f"🎯 Looking for: {user.get('match_pref', 'Everyone')}\n"
-        f"🎂 Age: {user.get('age', 'Not Set')}\n"
-        f"🌍 Country: {user.get('country', 'India')}\n"
-        f"🗣 Language: {user.get('language', 'English')}"
+        f"🚻 Gender: {gender}\n"
+        f"🎯 Looking for: Everyone\n"
+        f"🎂 Age: Not Set\n"
+        f"🌍 Country: India\n"
+        f"🗣 Language: English"
     )
 
     keyboard = InlineKeyboardMarkup([
@@ -552,6 +561,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
