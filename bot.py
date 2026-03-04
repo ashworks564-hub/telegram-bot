@@ -255,6 +255,7 @@ async def back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- REPORT ---------------- #
 
 async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
 
     if user_id not in active_chats:
@@ -262,10 +263,16 @@ async def report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     partner_id = active_chats[user_id]
-    users[partner_id]["reports"] += 1
+
+    cursor.execute(
+        "UPDATE users SET reports = reports + 1 WHERE user_id=%s",
+        (partner_id,)
+    )
+
+    conn.commit()
 
     await update.message.reply_text("🚩 User reported.")
-
+    
 # ---------------- NEXT ---------------- #
 
 async def next_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -514,6 +521,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
