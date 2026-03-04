@@ -279,21 +279,22 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
 
-    # Chat controls
+    # Chat buttons
     if query.data == "next":
         await next_chat(update, context)
 
     elif query.data == "end":
         await end_chat(update, context)
 
-    # Premium week button
+    # ---------------- 100 STARS ---------------- #
+
     elif query.data == "vip_week":
 
         text = (
             "⭐ 100 Telegram Stars / $1.99 for a week premium\n\n"
-            "You can buy Premium using Telegram Stars.\n"
-            "To buy Telegram Stars, you'll use the payment methods "
-            "from Google Play or the App Store.\n\n"
+            "You can buy Premium in @chatbot using Telegram Stars.\n"
+            "To buy Telegram Stars, you'll use the payment methods from "
+            "Google Play or the App Store.\n\n"
             "Get premium now:"
         )
 
@@ -304,7 +305,45 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         await query.message.reply_text(text, reply_markup=keyboard)
 
-    # Back to premium page
+    # ---------------- 250 STARS ---------------- #
+
+    elif query.data == "vip_month":
+
+        text = (
+            "⭐ 250 Telegram Stars / $3.99 for a month premium\n\n"
+            "You can buy Premium in @chatbot using Telegram Stars.\n"
+            "To buy Telegram Stars, you'll use the payment methods from "
+            "Google Play or the App Store.\n\n"
+            "Get premium now:"
+        )
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⭐ 250 Telegram Stars", callback_data="buy_month")],
+            [InlineKeyboardButton("← Back", callback_data="back_premium")]
+        ])
+
+        await query.message.reply_text(text, reply_markup=keyboard)
+
+    # ---------------- 1000 STARS ---------------- #
+
+    elif query.data == "vip_year":
+
+        text = (
+            "⭐ 1000 Telegram Stars / $19.99 for a year premium\n\n"
+            "You can buy Premium in @chatbot using Telegram Stars.\n"
+            "To buy Telegram Stars, you'll use the payment methods from "
+            "Google Play or the App Store.\n\n"
+            "Get premium now:"
+        )
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⭐ 1000 Telegram Stars", callback_data="buy_year")],
+            [InlineKeyboardButton("← Back", callback_data="back_premium")]
+        ])
+
+        await query.message.reply_text(text, reply_markup=keyboard)
+
+    # Back button
     elif query.data == "back_premium":
         await premium(update, context)
         
@@ -395,6 +434,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
