@@ -122,7 +122,22 @@ async def set_gender(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ---------------- FIND PARTNER ---------------- #
 
 async def find_partner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     user_id = update.effective_user.id
+
+    # check if user is banned
+    cursor.execute(
+        "SELECT banned FROM users WHERE user_id=%s",
+        (user_id,)
+    )
+
+    banned = cursor.fetchone()[0]
+
+    if banned:
+        await update.message.reply_text(
+            "🚫 You are banned from using this chat."
+        )
+        return
 
     # 🔥 FORCE CLEAN if stuck
     if user_id in active_chats:
@@ -537,6 +552,7 @@ def main():
 # 👇 THIS MUST BE OUTSIDE main()
 if __name__ == "__main__":
     main()
+
 
 
 
