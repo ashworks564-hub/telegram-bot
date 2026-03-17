@@ -239,18 +239,30 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def text_router(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = update.message.text
+    if not update.message:
+        return
 
-    if text == "🔎 Find Partner":
+    text = update.message.text.strip()
+
+    print("USER CLICKED:", text)  # debug
+
+    if "Find Partner" in text:
         await find_partner(update, context)
         return
 
-    if text == "👤 Profile":
+    elif "Profile" in text:
         await profile(update, context)
         return
 
-    if text == "⚙ Settings":
+    elif "Settings" in text:
         await settings(update, context)
+        return
+
+    elif "Premium" in text:
+        await premium(update, context)
+        return
+
+    else:
         return
         
 # ---------------- BUTTON HANDLER ---------------- #
