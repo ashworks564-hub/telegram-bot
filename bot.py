@@ -277,14 +277,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn = db()
     cursor = conn.cursor()
 
-    # -------- NEXT --------
+    # ---------------- NEXT ---------------- #
     if query.data == "next":
 
         cursor.execute(
             "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
             (user_id, user_id)
         )
-
         data = cursor.fetchone()
 
         if not data:
@@ -294,18 +293,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user1, user2 = data
         partner_id = user2 if user1 == user_id else user1
 
-        # delete chat
+        # remove chat
         cursor.execute(
             "DELETE FROM active_chats WHERE user1=%s OR user2=%s",
             (user_id, user_id)
         )
 
-        # re-add both users to queue
+        # add both back to waiting
         cursor.execute(
             "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
             (user_id,)
         )
-
         cursor.execute(
             "INSERT INTO waiting_users (user_id) VALUES (%s) ON CONFLICT DO NOTHING",
             (partner_id,)
@@ -314,19 +312,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         conn.close()
 
-        await context.bot.send_message(user_id, "⏭ Searching new partner...")
-        await context.bot.send_message(partner_id, "⏭ Searching new partner...")
+        await context.bot.send_message(user_id, "⏭ Finding new partner...")
+        await context.bot.send_message(partner_id, "⏭ Finding new partner...")
 
         await find_partner(update, context)
 
-    # -------- END --------
+    # ---------------- END ---------------- #
     elif query.data == "end":
 
         cursor.execute(
             "SELECT user1,user2 FROM active_chats WHERE user1=%s OR user2=%s",
             (user_id, user_id)
         )
-
         data = cursor.fetchone()
 
         if not data:
@@ -344,8 +341,17 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         conn.commit()
         conn.close()
 
-        await context.bot.send_message(user_id, "❌ Chat ended.", reply_markup=main_menu_keyboard)
-        await context.bot.send_message(partner_id, "❌ Partner left.", reply_markup=main_menu_keyboard)
+        await context.bot.send_message(
+            user_id,
+            "❌ Chat ended.",
+            reply_markup=main_menu_keyboard
+        )
+
+        await context.bot.send_message(
+            partner_id,
+            "❌ Partner disconnected.",
+            reply_markup=main_menu_keyboard
+        )
 
 
 # ---------------- MAIN ---------------- #
