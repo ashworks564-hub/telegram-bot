@@ -364,6 +364,9 @@ def main():
 
     app.add_handler(MessageHandler(filters.Regex("^(👦 Male|👧 Female)$"), set_gender))
 
+    # ✅ ADD THIS (THIS IS YOUR MISSING PIECE)
+    app.add_handler(CallbackQueryHandler(button_handler))
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_router))
 
     app.run_polling()
